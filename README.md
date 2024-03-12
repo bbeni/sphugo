@@ -4,7 +4,7 @@ My attempt at the assignments at ESC 202 course at UZH written in [GO](https://g
 
 ## 2d Particles Binary Partition
 
-partitions 1700 uniformely distributed particles in a 2d space and generates tree.png
+partitions 2200 uniformely distributed particles in a 2d space and generates tree.png
 
 ```console
 go run tree-partition-2d.go
