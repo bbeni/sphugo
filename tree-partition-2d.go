@@ -83,6 +83,15 @@ func init_uniformly(particles []Particle) {
 	}
 }
 
+/* TODO: fix failing test case nr 1
+ps1 := [...]Particle {
+	{pos: Vec2{0.0, 0.9}},
+	{pos: Vec2{0.5, -0.8}},
+	{pos: Vec2{1.7, 0.1}},
+	{pos: Vec2{0.7, -0.1}},
+	{pos: Vec2{-0.7, 0.1}},
+} */
+
 func Partition (ps []Particle, orientation Orientation, middle float64) (a, b []Particle) {
 	i := 0
 	j := len(ps) - 1
@@ -110,7 +119,9 @@ func Partition (ps []Particle, orientation Orientation, middle float64) (a, b []
 			if ps[j].pos.x >= middle { j-- }
 		}
 	}
-	return ps[:i+1], ps[i:]
+
+
+	return ps[:i], ps[i:]
 }
 
 func (root *Cell) Treebuild (orientation Orientation) {
@@ -292,7 +303,94 @@ func make_tree_png(particles []Particle, root* Cell) {
 }
 
 
+func test_case_logger(msg string) (func(passed bool, ps []Particle), func()) {
+	n_passed := 0
+	n_failed := 0
+	return func(passed bool, ps []Particle) {
+		if passed {
+			fmt.Printf("Passed test - ok\n")
+			n_passed++
+		} else {
+			fmt.Printf("Failed test - %q!\n\t got %v\n", msg, ps)
+			n_failed++
+		}
+	}, func() {
+		fmt.Printf("Test Summary:\n")
+		fmt.Printf("   Failed %v/%v tests\n", n_failed, n_passed + n_failed)
+		fmt.Printf("   Passed %v/%v tests\n", n_passed, n_passed + n_failed)
+		fmt.Printf("==================\n")
+	}
+}
+
+func test_cases() {
+
+	tl, summary := test_case_logger("Partition()")
+
+	ps := [...]Particle {
+		{pos: Vec2{1.0, 1.0}},
+		{pos: Vec2{0.9, 0.9}},
+		{pos: Vec2{0.8, 0.8}},
+		{pos: Vec2{0.7, 0.7}},
+	}
+
+    // func Partition (ps []Particle, orientation Orientation, middle float64) (a, b []Particle)
+
+	a, b := Partition(ps[:], Vertical, 0.5)
+	if len(a) != 0 { tl(false, a) } else { tl(true, a) }
+	if len(b) != 4 { tl(false, b) } else { tl(true, b) }
+
+	a, b = Partition(ps[:], Horizontal, 0.5)
+	if len(a) != 0 { tl(false, a) } else { tl(true, a) }
+	if len(b) != 4 { tl(false, b) } else { tl(true, b) }
+
+
+	a, b = Partition(ps[:], Vertical, 0.85)
+	if len(a) != 2 { tl(false, a) } else { tl(true, a) }
+	if len(b) != 2 { tl(false, b) } else { tl(true, b) }
+
+	a, b = Partition(ps[:], Horizontal, 0.85)
+	if len(a) != 2 { tl(false, a) } else { tl(true, a) }
+	if len(b) != 2 { tl(false, b) } else { tl(true, b) }
+
+
+	ps1 := [...]Particle {
+		{pos: Vec2{0.0, 0.9}},
+		{pos: Vec2{0.5, -0.8}},
+		{pos: Vec2{1.7, 0.1}},
+		{pos: Vec2{0.7, -0.1}},
+		{pos: Vec2{-0.7, 0.1}},
+	}
+
+	a, b = Partition(ps1[:], Vertical, 0.100000000001)
+	if len(a) != 4 { tl(false, a) } else { tl(true, a) }
+	if len(b) != 1 { tl(false, b) } else { tl(true, b) }
+
+	a, b = Partition(ps1[:], Horizontal, 0.601)
+	if len(a) != 3 { tl(false, a) } else { tl(true, a) }
+	if len(b) != 2 { tl(false, b) } else { tl(true, b) }
+
+	a, b = Partition(ps1[:], Vertical, -100)
+	if len(a) != 0 { tl(false, a) } else { tl(true, a) }
+	if len(b) != 5 { tl(false, b) } else { tl(true, b) }
+
+	a, b = Partition(ps1[:], Horizontal, 100)
+	if len(a) != 5 { tl(false, a) } else { tl(true, a) }
+	if len(b) != 0 { tl(false, b) } else { tl(true, b) }
+
+
+	ps2 := [...]Particle {}
+	a, b = Partition(ps2[:], Horizontal, 0.85)
+	if len(a) != 0 { tl(false, a) } else { tl(true, a) }
+	if len(b) != 0 { tl(false, b) } else { tl(true, b) }
+
+	summary()
+
+}
+
+
 func main() {
+
+	test_cases()
 
 	var particles [N_PARTICLES]Particle
 
