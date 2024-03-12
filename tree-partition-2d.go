@@ -12,7 +12,7 @@ import (
 
 // Configuration
 const (
-	N_PARTICLES = 1700
+	N_PARTICLES = 2200
 	MAX_PARTICLES_PER_CELL = 8
 	SPLIT_FRACTION = 0.5
 )
@@ -76,6 +76,10 @@ func (orientation Orientation) other() (Orientation) {
 }
 
 func init_uniformly(particles []Particle) {
+
+    //rand.Seed(time.Now().UnixNano())
+    rand.Seed(12345678)
+
 	for i, _ := range particles {
 		particles[i].pos = Vec2{rand.Float64(), rand.Float64()}
 		particles[i].pos = Vec2{rand.Float64(), rand.Float64()}
@@ -83,44 +87,31 @@ func init_uniformly(particles []Particle) {
 	}
 }
 
-/* TODO: fix failing test case nr 1
-ps1 := [...]Particle {
-	{pos: Vec2{0.0, 0.9}},
-	{pos: Vec2{0.5, -0.8}},
-	{pos: Vec2{1.7, 0.1}},
-	{pos: Vec2{0.7, -0.1}},
-	{pos: Vec2{-0.7, 0.1}},
-} */
-
 func Partition (ps []Particle, orientation Orientation, middle float64) (a, b []Particle) {
 	i := 0
 	j := len(ps) - 1
 
 	if orientation == Vertical {
 		for i < j {
-			if ps[i].pos.y > middle && ps[j].pos.y < middle {
+			for i < j && ps[i].pos.y <= middle { i++ }
+			for i < j && ps[j].pos.y > middle { j-- }
+
+			if ps[i].pos.y > ps[j].pos.y {
 				ps[i], ps[j] = ps[j], ps[i]
-				j--
-				i++
-				continue
 			}
-			if ps[i].pos.y <= middle { i++ }
-			if ps[j].pos.y >= middle { j-- }
+			if i == j && middle > ps[i].pos.y {i++}
 		}
 	} else {
 		for i < j {
-			if ps[i].pos.x > middle && ps[j].pos.x < middle {
+			for i < j && ps[i].pos.x <= middle { i++ }
+			for i < j && ps[j].pos.x > middle { j-- }
+
+			if ps[i].pos.x > ps[j].pos.x {
 				ps[i], ps[j] = ps[j], ps[i]
-				j--
-				i++
-				continue
 			}
-			if ps[i].pos.x <= middle { i++ }
-			if ps[j].pos.x >= middle { j-- }
 		}
+		if i == j && middle > ps[i].pos.x {i++}
 	}
-
-
 	return ps[:i], ps[i:]
 }
 
@@ -315,10 +306,11 @@ func test_case_logger(msg string) (func(passed bool, ps []Particle), func()) {
 			n_failed++
 		}
 	}, func() {
-		fmt.Printf("Test Summary:\n")
-		fmt.Printf("   Failed %v/%v tests\n", n_failed, n_passed + n_failed)
-		fmt.Printf("   Passed %v/%v tests\n", n_passed, n_passed + n_failed)
-		fmt.Printf("==================\n")
+		fmt.Println("=====================")
+		fmt.Printf ("Test Summary:\n")
+		fmt.Printf ("   Failed %v/%v tests\n", n_failed, n_passed + n_failed)
+		fmt.Printf ("   Passed %v/%v tests\n", n_passed, n_passed + n_failed)
+		fmt.Printf ("=====================\n")
 	}
 }
 
@@ -378,22 +370,44 @@ func test_cases() {
 	if len(b) != 0 { tl(false, b) } else { tl(true, b) }
 
 
+	ps1 = [...]Particle {
+		{pos: Vec2{0.9,  0.0}},
+		{pos: Vec2{-0.8,  0.5}},
+		{pos: Vec2{0.1,  1.7}},
+		{pos: Vec2{-0.1,  0.7}},
+		{pos: Vec2{0.1, -0.7}},
+	}
+
+	a, b = Partition(ps1[:], Horizontal, 0.100000000001)
+	if len(a) != 4 { tl(false, a) } else { tl(true, a) }
+	if len(b) != 1 { tl(false, b) } else { tl(true, b) }
+
+	a, b = Partition(ps1[:], Vertical, 0.601)
+	if len(a) != 3 { tl(false, a) } else { tl(true, a) }
+	if len(b) != 2 { tl(false, b) } else { tl(true, b) }
+
+	a, b = Partition(ps1[:], Horizontal, -100)
+	if len(a) != 0 { tl(false, a) } else { tl(true, a) }
+	if len(b) != 5 { tl(false, b) } else { tl(true, b) }
+
+	a, b = Partition(ps1[:], Vertical, 100)
+	if len(a) != 5 { tl(false, a) } else { tl(true, a) }
+	if len(b) != 0 { tl(false, b) } else { tl(true, b) }
+
+
 	ps2 := [...]Particle {}
 	a, b = Partition(ps2[:], Horizontal, 0.85)
 	if len(a) != 0 { tl(false, a) } else { tl(true, a) }
 	if len(b) != 0 { tl(false, b) } else { tl(true, b) }
 
 	summary()
-
 }
-
 
 func main() {
 
 	test_cases()
 
 	var particles [N_PARTICLES]Particle
-
 	init_uniformly(particles[:])
 
 	root := Cell{
@@ -403,9 +417,9 @@ func main() {
 	}
 
 	root.Treebuild(Vertical)
-
 	//root.Dumptree(0)
 
 	make_tree_png(root.particles[:], &root)
+	fmt.Printf("Created %s", TREE_PNG_FNAME)
 
 }
