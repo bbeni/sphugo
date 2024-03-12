@@ -1,6 +1,6 @@
 # ESC 202 Assignments
 
-My attempt at the assignments at ESC 202 course at UZH written in [GO]{https://go.dev/ "Go Language"}.
+My attempt at the assignments at ESC 202 course at UZH written in [GO](https://go.dev/ "Go Language"). 🦆
 
 ## 2d Particles Binary Partition
 
