@@ -8,20 +8,22 @@ import (
 	"image"
 	"image/png"
 	"image/color"
+	"time"
 )
 
 // Configuration
 const (
 	N_PARTICLES = 2200
 	MAX_PARTICLES_PER_CELL = 8
-	SPLIT_FRACTION = 0.5
+	SPLIT_FRACTION = 0.5       // Fraction of left to total space for Treebuild(), usually 0.5.
+	USE_RANDOM_SEED = false    // for generating randomly distributed particles in init_uniformly()
 )
 
 // Image generation config
 const (
 	IMAGE_W = 512*2
 	IMAGE_H = 512*2
-	RECT_OFFSET = 1
+	RECT_OFFSET = 1  // Pixel offset for upper right corner in negative x and y direction
 	TREE_PNG_FNAME = "tree.png"
 )
 
@@ -77,8 +79,11 @@ func (orientation Orientation) other() (Orientation) {
 
 func init_uniformly(particles []Particle) {
 
-    //rand.Seed(time.Now().UnixNano())
-    rand.Seed(12345678)
+	if USE_RANDOM_SEED {
+		rand.Seed(time.Now().UnixNano())
+	} else {
+	    rand.Seed(12345678)
+	}
 
 	for i, _ := range particles {
 		particles[i].pos = Vec2{rand.Float64(), rand.Float64()}
@@ -86,6 +91,13 @@ func init_uniformly(particles []Particle) {
 		particles[i].rho = 1
 	}
 }
+
+
+/* The function Partition() partitions an array of type Particle based
+ on their 2d position. They are compared to a pivot value called middle
+ in a "bubble sort like" manner in a specified axis that can either be
+ "Vertical" or "Horizontal". The tests should cover most edge cases.
+ Returns two partitioned slices a, b (just indices of array in Go).*/
 
 func Partition (ps []Particle, orientation Orientation, middle float64) (a, b []Particle) {
 	i := 0
@@ -114,6 +126,13 @@ func Partition (ps []Particle, orientation Orientation, middle float64) (a, b []
 	}
 	return ps[:i], ps[i:]
 }
+
+
+/*The function Treebuild() recurses and partitions an array of
+ N_PARTICLES length int Cells that have maximally
+ MAX_PARTICLES_PER_CELL particles.
+ The SPLIT_FRACTION determines the fraction of space in
+ the specific direction for left/total or top/total. */
 
 func (root *Cell) Treebuild (orientation Orientation) {
 	
@@ -393,7 +412,6 @@ func test_cases() {
 	a, b = Partition(ps1[:], Vertical, 100)
 	if len(a) != 5 { tl(false, a) } else { tl(true, a) }
 	if len(b) != 0 { tl(false, b) } else { tl(true, b) }
-
 
 	ps2 := [...]Particle {}
 	a, b = Partition(ps2[:], Horizontal, 0.85)
