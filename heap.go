@@ -5,19 +5,20 @@ This packacke should provide methods for heapification of arrays.
 
 TODOs:
 	Goals:
-		- Min-Heap
-		- Max-Heap
+		- [x] Min-Heap
+		- [ ] Max-Heap
 		- Maybe Fibonacci Heap
 		- Maybe Binomial Heap
 		- ...
 
 	Functionality:
-		- BuildHeap
-		- DecreaseKey
-		- Insert
-		- Remove
-		- Find Min/Max
-		- Extract Min/Max
+		- [x] BuildHeap
+		- [ ] DecreaseKey
+		- [x] Insert
+		- [ ] Remove
+		- [x] Replace
+		- [x] Find Min/Max
+		- [x] Extract Min/Max
 */
 
 package main
@@ -27,6 +28,7 @@ import (
 	"math/rand"
 	"cmp"
 	"strings"
+	"errors"
 )
 
 /* Heap indexed in the following way:
@@ -93,14 +95,53 @@ func HeapifyRec[T cmp.Ordered](array []T, i int) {
 }
 
 func BuildHeap[T cmp.Ordered](array []T) {
-
-	if len(array) < 2 {
-		return
-	}
-
+	if len(array) < 2 { return }
 	for i := len(array)/2 - 1; i >= 0; i-- {
 		Heapify(array, i)
 	}
+}
+
+func Insert[T cmp.Ordered](array []T, element T) ([]T) {
+	array = append(array, element)
+	index := len(array)-1
+	parent := len(array)/2 - 1
+	for parent >= 0 && array[index] < array[parent] {
+		array[parent], array[index] = array[index], array[parent]
+		index, parent = parent, (parent + 1)/2 - 1
+	}
+	return array
+}
+
+func FindMin[T cmp.Ordered](array []T) (T, error) {
+	if len(array) == 0 {
+		var def T
+		return def, errors.New("in FindMin(): array can not be empty")
+	}
+	return array[0], nil
+}
+
+func ExtractMin[T cmp.Ordered](array []T) ([]T, T, error) {
+	if len(array) == 0 {
+		var def T
+		return array, def, errors.New("in ExtractMin(): array can not be empty")
+	}
+	min := array[0]
+	array[0] = array[len(array) - 1]
+	array = array[:len(array) - 1]
+	Heapify(array, 0)
+	return  array, min, nil
+}
+
+func Replace[T cmp.Ordered](array []T, element T) ([]T, T, error) {
+	if len(array) == 0 {
+		var def T
+		return array, def, errors.New("in Replace(): array can not be empty")
+	}
+
+	min := array[0]
+	array[0] = element
+	Heapify(array, 0)
+	return array, min, nil
 }
 
 func dump[T cmp.Ordered](x []T, index, level int) {
@@ -160,9 +201,12 @@ func DumpHeap[T cmp.Ordered](array []T) {
 		mid_spaces := spaces(mid_count)
 		for j := range offset + 1 {
 			index := j + offset
-			if index < len(array)/2 {
+			if index < len(array)/2{
 				n_spaces := 1 << (level - i - 1)
-				fmt.Printf(spaces(n_spaces) + "/" + mid_spaces + "\\" + spaces(n_spaces))
+				fmt.Printf(spaces(n_spaces) + "/")
+				if index <= len(array)/2 - 2 || len(array) % 2 == 1  {
+					fmt.Printf(mid_spaces + "\\" + spaces(n_spaces))
+				}
 			}
 		}
 		fmt.Print("\n")
@@ -184,9 +228,22 @@ func main() {
 
 	BuildHeap(array)
 
-	fmt.Printf("after heapification:  %v\n", array)
+	fmt.Printf("after heapification:  %v\n\n", array)
 	fmt.Println("visualisation to check for correctness:")
-
 	DumpHeap(array)
+
+	fmt.Println("Insert 0 into the Heap:")
+	array = Insert(array, 0)
+	DumpHeap(array)
+
+	array, _, _ = ExtractMin(array)
+	fmt.Print("ExtractMin from Heap:\n\n")
+	DumpHeap(array)
+
+	array, _, _ = Replace(array, 33)
+	fmt.Print("Replace with 33 with root node:\n\n")
+	DumpHeap(array)
+
+
 
 }
