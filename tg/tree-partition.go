@@ -1,4 +1,4 @@
-package main
+package tg
 
 import (
 	"os"
@@ -45,23 +45,23 @@ func Min(x, y int) int {
 
 // Linear algebra
 type Vec2i struct {
-	x, y int
+	X, Y int
 }
 
 type Vec2 struct {
-	x, y float64
+	X, Y float64
 }
 
 
 type Particle struct {
-	pos, vel Vec2
-	rho float64
+	Pos, Vel Vec2
+	Rho float64
 }
 
 type Cell struct {
-	lower_left Vec2
-	upper_right Vec2
-	particles []Particle
+	LowerLeft Vec2
+	UpperRight Vec2
+	Particles []Particle
 	lower *Cell
 	upper *Cell
 }
@@ -77,7 +77,7 @@ func (orientation Orientation) other() (Orientation) {
 	return Vertical
 }
 
-func init_uniformly(particles []Particle) {
+func InitUniformly(particles []Particle) {
 
 	if USE_RANDOM_SEED {
 		rand.Seed(time.Now().UnixNano())
@@ -86,9 +86,9 @@ func init_uniformly(particles []Particle) {
 	}
 
 	for i, _ := range particles {
-		particles[i].pos = Vec2{rand.Float64(), rand.Float64()}
-		particles[i].pos = Vec2{rand.Float64(), rand.Float64()}
-		particles[i].rho = 1
+		particles[i].Pos = Vec2{rand.Float64(), rand.Float64()}
+		particles[i].Pos = Vec2{rand.Float64(), rand.Float64()}
+		particles[i].Rho = 1
 	}
 }
 
@@ -105,24 +105,24 @@ func Partition (ps []Particle, orientation Orientation, middle float64) (a, b []
 
 	if orientation == Vertical {
 		for i < j {
-			for i < j && ps[i].pos.y <= middle { i++ }
-			for i < j && ps[j].pos.y > middle { j-- }
+			for i < j && ps[i].Pos.Y <= middle { i++ }
+			for i < j && ps[j].Pos.Y > middle { j-- }
 
-			if ps[i].pos.y > ps[j].pos.y {
+			if ps[i].Pos.Y > ps[j].Pos.Y {
 				ps[i], ps[j] = ps[j], ps[i]
 			}
-			if i == j && middle > ps[i].pos.y {i++}
+			if i == j && middle > ps[i].Pos.Y {i++}
 		}
 	} else {
 		for i < j {
-			for i < j && ps[i].pos.x <= middle { i++ }
-			for i < j && ps[j].pos.x > middle { j-- }
+			for i < j && ps[i].Pos.X <= middle { i++ }
+			for i < j && ps[j].Pos.X > middle { j-- }
 
-			if ps[i].pos.x > ps[j].pos.x {
+			if ps[i].Pos.X > ps[j].Pos.X {
 				ps[i], ps[j] = ps[j], ps[i]
 			}
 		}
-		if i == j && middle > ps[i].pos.x {i++}
+		if i == j && middle > ps[i].Pos.X {i++}
 	}
 	return ps[:i], ps[i:]
 }
@@ -138,24 +138,24 @@ func (root *Cell) Treebuild (orientation Orientation) {
 	
 	var mid float64
 	if orientation == Vertical {
-		mid = SPLIT_FRACTION * root.lower_left.y + (1 - SPLIT_FRACTION) * root.upper_right.y
+		mid = SPLIT_FRACTION * root.LowerLeft.Y + (1 - SPLIT_FRACTION) * root.UpperRight.Y
 	} else {
-		mid = SPLIT_FRACTION * root.lower_left.x + (1 - SPLIT_FRACTION) * root.upper_right.x
+		mid = SPLIT_FRACTION * root.LowerLeft.X + (1 - SPLIT_FRACTION) * root.UpperRight.X
 	}
 	
-	a, b := Partition(root.particles, orientation, mid)
+	a, b := Partition(root.Particles, orientation, mid)
 	
 	if len(a) > 0 {
 		root.lower = &Cell{
-			particles: a,
-			lower_left: root.lower_left,
-			upper_right: root.upper_right,
+			Particles: a,
+			LowerLeft: root.LowerLeft,
+			UpperRight: root.UpperRight,
 		}
 
 		if orientation == Vertical {
-			root.lower.upper_right.y = mid
+			root.lower.UpperRight.Y = mid
 		} else {
-			root.lower.upper_right.x = mid
+			root.lower.UpperRight.X = mid
 		}
 
 		if len(a) > MAX_PARTICLES_PER_CELL {
@@ -165,15 +165,15 @@ func (root *Cell) Treebuild (orientation Orientation) {
 
 	if len(b) > 0 {
 		root.upper = &Cell{
-			particles: b,
-			lower_left: root.lower_left,
-			upper_right: root.upper_right,
+			Particles: b,
+			LowerLeft: root.LowerLeft,
+			UpperRight: root.UpperRight,
 		}
 
 		if orientation == Vertical {
-			root.upper.lower_left.y = mid
+			root.upper.LowerLeft.Y = mid
 		} else {
-			root.upper.lower_left.x = mid
+			root.upper.LowerLeft.X = mid
 		}
 
 		if len(b) > MAX_PARTICLES_PER_CELL {
@@ -184,7 +184,7 @@ func (root *Cell) Treebuild (orientation Orientation) {
 
 func (root *Cell) Dumptree(level int) {
 	for i := 0; i < level; i++ { fmt.Print("  ") }
-	fmt.Println(root.lower_left, root.upper_right)
+	fmt.Println(root.LowerLeft, root.UpperRight)
 	if root.upper != nil {
 		root.upper.Dumptree(level + 1)
 	}
@@ -214,8 +214,8 @@ func rainbow_ramp(index uint8) (color.NRGBA){
 
 func draw_line(img *image.NRGBA, a, b Vec2i, color color.NRGBA) {
 
-	delta_x := b.x - a.x
-	delta_y := b.y - a.y
+	delta_x := b.X - a.X
+	delta_y := b.Y - a.Y
 
 	step_x := 1
 	if delta_x < 0 { step_x = -1 }
@@ -224,20 +224,20 @@ func draw_line(img *image.NRGBA, a, b Vec2i, color color.NRGBA) {
 	if delta_y < 0 { step_y = -1 }
 
 	if delta_x == 0 && delta_y == 0 {
-		img.Set(a.x, a.y, color)
+		img.Set(a.X, a.Y, color)
 		return
 	}
 
 	if Abs(delta_x) >= Abs(delta_y) {
 		for i := range (Abs(delta_x) + 1) {
-			x := b.x - step_x * i
-			y := b.y - int(float64(delta_y * i * step_x) / float64(delta_x))
+			x := b.X - step_x * i
+			y := b.Y - int(float64(delta_y * i * step_x) / float64(delta_x))
 			img.Set(x, y, color)
 		}
 	} else {
 		for i := range (Abs(delta_y) + 1) {
-			y := b.y - step_y * i
-			x := b.x - int(float64(delta_x * i * step_y) / float64(delta_y))
+			y := b.Y - step_y * i
+			x := b.X - int(float64(delta_x * i * step_y) / float64(delta_y))
 			img.Set(x, y, color)
 		}
 	}
@@ -251,10 +251,10 @@ func draw_quad(img *image.NRGBA, x1, y1, x2, y2 int, color color.NRGBA) {
 }
 
 func draw_cells(img *image.NRGBA, w, h int, root *Cell, level, max_level int) {
-	x1 := int(root.lower_left.x * float64(w))
-	y1 := int(root.lower_left.y * float64(h))
-	x2 := int(root.upper_right.x * float64(w))
-	y2 := int(root.upper_right.y * float64(h))
+	x1 := int(root.LowerLeft.X * float64(w))
+	y1 := int(root.LowerLeft.Y * float64(h))
+	x2 := int(root.UpperRight.X * float64(w))
+	y2 := int(root.UpperRight.Y * float64(h))
 
 	if root.lower != nil {
 		draw_cells(img, w, h, root.lower, level + 1, max_level)
@@ -268,7 +268,7 @@ func draw_cells(img *image.NRGBA, w, h int, root *Cell, level, max_level int) {
 	draw_quad(img, x1, y1, x2 - 1, y2 - 1, rainbow_ramp(color_index))
 }
 
-func make_tree_png(particles []Particle, root* Cell) {
+func MakeTreePng(particles []Particle, root* Cell) {
 
 	const w, h = IMAGE_W, IMAGE_H
 	black := color.NRGBA{R: 0, G: 0, B: 0, A: 255}
@@ -288,8 +288,8 @@ func make_tree_png(particles []Particle, root* Cell) {
 
 	// Draw all particles in white
 	for _, particle := range particles {
-		x := int(particle.pos.x * w)
-		y := int(particle.pos.y * w)
+		x := int(particle.Pos.X * w)
+		y := int(particle.Pos.Y * w)
 		img.Set(x, y, white)
 	}
 
@@ -338,10 +338,10 @@ func test_cases() {
 	tl, summary := test_case_logger("Partition()")
 
 	ps := [...]Particle {
-		{pos: Vec2{1.0, 1.0}},
-		{pos: Vec2{0.9, 0.9}},
-		{pos: Vec2{0.8, 0.8}},
-		{pos: Vec2{0.7, 0.7}},
+		{Pos: Vec2{1.0, 1.0}},
+		{Pos: Vec2{0.9, 0.9}},
+		{Pos: Vec2{0.8, 0.8}},
+		{Pos: Vec2{0.7, 0.7}},
 	}
 
     // func Partition (ps []Particle, orientation Orientation, middle float64) (a, b []Particle)
@@ -365,11 +365,11 @@ func test_cases() {
 
 
 	ps1 := [...]Particle {
-		{pos: Vec2{0.0, 0.9}},
-		{pos: Vec2{0.5, -0.8}},
-		{pos: Vec2{1.7, 0.1}},
-		{pos: Vec2{0.7, -0.1}},
-		{pos: Vec2{-0.7, 0.1}},
+		{Pos: Vec2{0.0, 0.9}},
+		{Pos: Vec2{0.5, -0.8}},
+		{Pos: Vec2{1.7, 0.1}},
+		{Pos: Vec2{0.7, -0.1}},
+		{Pos: Vec2{-0.7, 0.1}},
 	}
 
 	a, b = Partition(ps1[:], Vertical, 0.100000000001)
@@ -390,11 +390,11 @@ func test_cases() {
 
 
 	ps1 = [...]Particle {
-		{pos: Vec2{0.9,  0.0}},
-		{pos: Vec2{-0.8,  0.5}},
-		{pos: Vec2{0.1,  1.7}},
-		{pos: Vec2{-0.1,  0.7}},
-		{pos: Vec2{0.1, -0.7}},
+		{Pos: Vec2{0.9,  0.0}},
+		{Pos: Vec2{-0.8,  0.5}},
+		{Pos: Vec2{0.1,  1.7}},
+		{Pos: Vec2{-0.1,  0.7}},
+		{Pos: Vec2{0.1, -0.7}},
 	}
 
 	a, b = Partition(ps1[:], Horizontal, 0.100000000001)
@@ -426,18 +426,18 @@ func main() {
 	test_cases()
 
 	var particles [N_PARTICLES]Particle
-	init_uniformly(particles[:])
+	InitUniformly(particles[:])
 
 	root := Cell{
-		lower_left: Vec2{0, 0},
-		upper_right: Vec2{1, 1},
-		particles: particles[:],
+		LowerLeft: Vec2{0, 0},
+		UpperRight: Vec2{1, 1},
+		Particles: particles[:],
 	}
 
 	root.Treebuild(Vertical)
 	//root.Dumptree(0)
 
-	make_tree_png(root.particles[:], &root)
+	MakeTreePng(root.Particles[:], &root)
 	fmt.Printf("Created %s", TREE_PNG_FNAME)
 
 }

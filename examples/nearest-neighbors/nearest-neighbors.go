@@ -1,5 +1,5 @@
-/*
-K-nearest-neighbor search
+/* K-nearest-neighbor search Example
+
 Author: Benjamin Frölich
 
 Goal:

@@ -1,8 +1,8 @@
-# ESC 202 Assignments
+# ESC 202 Simulations
 
-My attempt at the assignments at ESC 202 course at UZH written in [GO](https://go.dev/ "Go Language"). 🦆
+My attempt at the assignments at ESC 202 course at UZH written in [GO](https://go.dev/ "Go Language"). 🦆 The Goal seems to be to have a working Smooth Particle Hydrodynamics code. Go as a language was chosen to easily parallelize the simulation and have fast compiled code.
 
-## 2d Particles Binary Partition
+## 1. Example - Binary Partition 2d Particles
 
 Goal:
 
@@ -11,7 +11,7 @@ Goal:
 partitions 2200 uniformely distributed particles in a 2d space and generates tree.png.
 
 ```console
-go run examples/tree-partition.go
+go run ./examples/tree-partition/
 ```
 
 The function Partition() partitions an array of type Particle based on their 2d position. They are compared to a pivot value called middle in a "bubble sort like" manner in a specified axis that can either be "Vertical" or "Horizontal". The tests should cover most edge cases. Returns two partitioned slices a, b (just indices of array in Go).
@@ -20,7 +20,7 @@ The function Treebuild() recurses and partitions an array of N_PARTICLES length 
 
 ### Visualisation
 
-A png picture is generated from a tree with the make_tree_png() function. The following parameters are used for generating the picture:
+A png picture is generated from a tree with the MakeTreePng() function. The following parameters are used for generating the picture:
 
 	N_PARTICLES = 2200
 	MAX_PARTICLES_PER_CELL = 8
@@ -31,3 +31,11 @@ A png picture is generated from a tree with the make_tree_png() function. The fo
 #### Treebuild visualization
 
 ![](tree.png)
+
+## 2. Example - Heap
+
+Showcase BuildHeap, Insert, ExtractMin, Replace functionality. Dumptree() function for visualizing the tree and check for correctness.
+
+```console
+go run ./examples/heap/
+```

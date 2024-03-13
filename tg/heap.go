@@ -21,7 +21,7 @@ TODOs:
 		- [x] Extract Min/Max
 */
 
-package main
+package tg
 
 import (
 	"fmt"
@@ -213,7 +213,7 @@ func DumpHeap[T cmp.Ordered](array []T) {
 	}
 }
 
-func main() {
+func main1() {
 
 	rand.Seed(101)
 
