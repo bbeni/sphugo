@@ -44,6 +44,6 @@ func main() {
 	//root.Dumptree(0)
 
 	tg.MakeTreePng(root.Particles[:], &root)
-	fmt.Printf("Created %s", TREE_PNG_FNAME)
+	fmt.Printf("Created %s\n", TREE_PNG_FNAME)
 
 }
