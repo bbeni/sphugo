@@ -11,7 +11,7 @@ Goal:
 partitions 2200 uniformely distributed particles in a 2d space and generates tree.png.
 
 ```console
-go run tree-partition-2d.go
+go run examples/tree-partition.go
 ```
 
 The function Partition() partitions an array of type Particle based on their 2d position. They are compared to a pivot value called middle in a "bubble sort like" manner in a specified axis that can either be "Vertical" or "Horizontal". The tests should cover most edge cases. Returns two partitioned slices a, b (just indices of array in Go).
