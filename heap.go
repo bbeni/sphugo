@@ -26,6 +26,7 @@ import (
 	"fmt"
 	"math/rand"
 	"cmp"
+	"strings"
 )
 
 /* Heap indexed in the following way:
@@ -135,28 +136,37 @@ func DumpHeap1[T cmp.Ordered](array []T) {
 // print the Heap like in text books, but we are in a terminal
 
 func DumpHeap[T cmp.Ordered](array []T) {
-	const spacing = " "
-	level := 0
-	for (len(array) >> level) != 0 {
-		level++
+
+	spaces := func(amount int) (string) {
+		return strings.Repeat(" ", amount)
 	}
 
+	level := 0
+	for (len(array) >> level) != 0 { level++ }
+
 	fmt.Println()
-	for range 1 << level - 6 { fmt.Printf(spacing) }
-	fmt.Println("[Root Node]")
+	fmt.Println(spaces(1 << level - 6) + "[Root Node]")
 	for i := range level {
 		offset := 1 << i - 1
 		for j := range offset + 1 {
 			index := j + offset
 			if index < len(array) {
-				for range 1 << (level - i) - 1 { fmt.Printf(spacing) }
-				fmt.Printf("%v", array[index])
-				for range 1 << (level - i) - 1 { fmt.Printf(spacing) }
+				n_spaces := 1 << (level - i) - 1
+				fmt.Printf(spaces(n_spaces) + "%v" + spaces(n_spaces), array[index])
 			}
 		}
 		fmt.Print("\n\n")
+		mid_count := 1 << (level - i) - 2
+		mid_spaces := spaces(mid_count)
+		for j := range offset + 1 {
+			index := j + offset
+			if index < len(array)/2 {
+				n_spaces := 1 << (level - i - 1)
+				fmt.Printf(spaces(n_spaces) + "/" + mid_spaces + "\\" + spaces(n_spaces))
+			}
+		}
+		fmt.Print("\n")
 	}
-	fmt.Println()
 }
 
 func main() {
@@ -166,7 +176,7 @@ func main() {
 	array := make([]int, 0, ARRAY_CAP)
 
 	for _ = range 26 {
-		array = append(array, rand.Int() % 101)
+		array = append(array, rand.Int() % 90 + 9)
 	}
 
 	fmt.Printf("\n")
