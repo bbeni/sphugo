@@ -14,7 +14,7 @@ partitions 2200 uniformely distributed particles in a 2d space and generates tre
 go run ./examples/tree-partition/
 ```
 
-The function Partition() partitions an array of type Particle based on their 2d position. They are compared to a pivot value called middle in a "bubble sort like" manner in a specified axis that can either be "Vertical" or "Horizontal". The tests should cover most edge cases. Returns two partitioned slices a, b (just indices of array in Go).
+The function Partition() partitions an array of type Particle based on their 2d position. They are compared to a pivot value called middle in a "bubble sort like" manner in a specified axis that can either be "Vertical" or "Horizontal". Returns two partitioned slices a, b. The tests should cover most edge cases (run ```go test -v ./tg```).
 
 The function Treebuild() recurses and partitions an array of N_PARTICLES length int Cells that have maximally MAX_PARTICLES_PER_CELL particles. The SPLIT_FRACTION determines the fraction of space in the specific direction for left/total or top/total.
 
@@ -34,8 +34,16 @@ A png picture is generated from a tree with the MakeTreePng() function. The foll
 
 ## 2. Example - Heap
 
-Showcase BuildHeap, Insert, ExtractMin, Replace functionality. Dumptree() function for visualizing the tree and check for correctness.
+Showcase BuildHeap, Insert, ExtractMin, Replace functionality. Dumptree function used for visualizing the tree in terminal (text form) and check for correctness.
 
 ```console
 go run ./examples/heap/
+```
+
+## Tests
+
+To run all tests (only Partition function covered for now):
+
+```console
+go test -v ./...
 ```

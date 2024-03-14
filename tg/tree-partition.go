@@ -300,144 +300,14 @@ func MakeTreePng(particles []Particle, root* Cell) {
 
 	file, err := os.Create(TREE_PNG_FNAME)
 	if err != nil {
-		log.Fatal("Error: couldn't create file %q : %q", TREE_PNG_FNAME, err)
+		log.Fatalf("Error: couldn't create file %q : %q", TREE_PNG_FNAME, err)
 		os.Exit(1)
 	}
 	defer file.Close()
 
 	err = png.Encode(file, img)
 	if err != nil {
-		log.Fatal("Error: couldn't encode PNG %q : %q", TREE_PNG_FNAME, err)
+		log.Fatalf("Error: couldn't encode PNG %q : %q", TREE_PNG_FNAME, err)
 		os.Exit(1)
 	}
-}
-
-
-func test_case_logger(msg string) (func(passed bool, ps []Particle), func()) {
-	n_passed := 0
-	n_failed := 0
-	return func(passed bool, ps []Particle) {
-		if passed {
-			fmt.Printf("Passed test - ok\n")
-			n_passed++
-		} else {
-			fmt.Printf("Failed test - %q!\n\t got %v\n", msg, ps)
-			n_failed++
-		}
-	}, func() {
-		fmt.Println("=====================")
-		fmt.Printf ("Test Summary:\n")
-		fmt.Printf ("   Failed %v/%v tests\n", n_failed, n_passed + n_failed)
-		fmt.Printf ("   Passed %v/%v tests\n", n_passed, n_passed + n_failed)
-		fmt.Printf ("=====================\n")
-	}
-}
-
-func test_cases() {
-
-	tl, summary := test_case_logger("Partition()")
-
-	ps := [...]Particle {
-		{Pos: Vec2{1.0, 1.0}},
-		{Pos: Vec2{0.9, 0.9}},
-		{Pos: Vec2{0.8, 0.8}},
-		{Pos: Vec2{0.7, 0.7}},
-	}
-
-    // func Partition (ps []Particle, orientation Orientation, middle float64) (a, b []Particle)
-
-	a, b := Partition(ps[:], Vertical, 0.5)
-	if len(a) != 0 { tl(false, a) } else { tl(true, a) }
-	if len(b) != 4 { tl(false, b) } else { tl(true, b) }
-
-	a, b = Partition(ps[:], Horizontal, 0.5)
-	if len(a) != 0 { tl(false, a) } else { tl(true, a) }
-	if len(b) != 4 { tl(false, b) } else { tl(true, b) }
-
-
-	a, b = Partition(ps[:], Vertical, 0.85)
-	if len(a) != 2 { tl(false, a) } else { tl(true, a) }
-	if len(b) != 2 { tl(false, b) } else { tl(true, b) }
-
-	a, b = Partition(ps[:], Horizontal, 0.85)
-	if len(a) != 2 { tl(false, a) } else { tl(true, a) }
-	if len(b) != 2 { tl(false, b) } else { tl(true, b) }
-
-
-	ps1 := [...]Particle {
-		{Pos: Vec2{0.0, 0.9}},
-		{Pos: Vec2{0.5, -0.8}},
-		{Pos: Vec2{1.7, 0.1}},
-		{Pos: Vec2{0.7, -0.1}},
-		{Pos: Vec2{-0.7, 0.1}},
-	}
-
-	a, b = Partition(ps1[:], Vertical, 0.100000000001)
-	if len(a) != 4 { tl(false, a) } else { tl(true, a) }
-	if len(b) != 1 { tl(false, b) } else { tl(true, b) }
-
-	a, b = Partition(ps1[:], Horizontal, 0.601)
-	if len(a) != 3 { tl(false, a) } else { tl(true, a) }
-	if len(b) != 2 { tl(false, b) } else { tl(true, b) }
-
-	a, b = Partition(ps1[:], Vertical, -100)
-	if len(a) != 0 { tl(false, a) } else { tl(true, a) }
-	if len(b) != 5 { tl(false, b) } else { tl(true, b) }
-
-	a, b = Partition(ps1[:], Horizontal, 100)
-	if len(a) != 5 { tl(false, a) } else { tl(true, a) }
-	if len(b) != 0 { tl(false, b) } else { tl(true, b) }
-
-
-	ps1 = [...]Particle {
-		{Pos: Vec2{0.9,  0.0}},
-		{Pos: Vec2{-0.8,  0.5}},
-		{Pos: Vec2{0.1,  1.7}},
-		{Pos: Vec2{-0.1,  0.7}},
-		{Pos: Vec2{0.1, -0.7}},
-	}
-
-	a, b = Partition(ps1[:], Horizontal, 0.100000000001)
-	if len(a) != 4 { tl(false, a) } else { tl(true, a) }
-	if len(b) != 1 { tl(false, b) } else { tl(true, b) }
-
-	a, b = Partition(ps1[:], Vertical, 0.601)
-	if len(a) != 3 { tl(false, a) } else { tl(true, a) }
-	if len(b) != 2 { tl(false, b) } else { tl(true, b) }
-
-	a, b = Partition(ps1[:], Horizontal, -100)
-	if len(a) != 0 { tl(false, a) } else { tl(true, a) }
-	if len(b) != 5 { tl(false, b) } else { tl(true, b) }
-
-	a, b = Partition(ps1[:], Vertical, 100)
-	if len(a) != 5 { tl(false, a) } else { tl(true, a) }
-	if len(b) != 0 { tl(false, b) } else { tl(true, b) }
-
-	ps2 := [...]Particle {}
-	a, b = Partition(ps2[:], Horizontal, 0.85)
-	if len(a) != 0 { tl(false, a) } else { tl(true, a) }
-	if len(b) != 0 { tl(false, b) } else { tl(true, b) }
-
-	summary()
-}
-
-func main() {
-
-	test_cases()
-
-	var particles [N_PARTICLES]Particle
-	InitUniformly(particles[:])
-
-	root := Cell{
-		LowerLeft: Vec2{0, 0},
-		UpperRight: Vec2{1, 1},
-		Particles: particles[:],
-	}
-
-	root.Treebuild(Vertical)
-	//root.Dumptree(0)
-
-	MakeTreePng(root.Particles[:], &root)
-	fmt.Printf("Created %s", TREE_PNG_FNAME)
-
 }
