@@ -212,38 +212,3 @@ func DumpHeap[T cmp.Ordered](array []T) {
 		fmt.Print("\n")
 	}
 }
-
-func main1() {
-
-	rand.Seed(101)
-
-	array := make([]int, 0, ARRAY_CAP)
-
-	for _ = range 26 {
-		array = append(array, rand.Int() % 90 + 9)
-	}
-
-	fmt.Printf("\n")
-	fmt.Printf("initial array was:    %v\n", array)
-
-	BuildHeap(array)
-
-	fmt.Printf("after heapification:  %v\n\n", array)
-	fmt.Println("visualisation to check for correctness:")
-	DumpHeap(array)
-
-	fmt.Println("Insert 0 into the Heap:")
-	array = Insert(array, 0)
-	DumpHeap(array)
-
-	array, _, _ = ExtractMin(array)
-	fmt.Print("ExtractMin from Heap:\n\n")
-	DumpHeap(array)
-
-	array, _, _ = Replace(array, 33)
-	fmt.Print("Replace with 33 with root node:\n\n")
-	DumpHeap(array)
-
-
-
-}
