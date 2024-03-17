@@ -55,10 +55,13 @@ func PlotBoundingCircles (c gx.Canvas, root *Cell, color gx.Color) {
 
 	if root.Upper == nil && root.Lower == nil {
 
-		x := float32(root.Center.X*float64(c.W))
-		y := float32(root.Center.Y*float64(c.H))
-		r := float32(math.Sqrt(root.BMinSquared)) * float32(c.W) // incorrect: use width for now
+		x := float32(root.BCenter.X*float64(c.W))
+		y := float32(root.BCenter.Y*float64(c.H))
+		r := float32(math.Sqrt(root.BRadiusSq)) * float32(c.W) // incorrect: use width for now
 
+		if r < 2 {
+			r = 2
+		}
 		c.DrawCircle(x, y, r, 1.0, color)
 	}
 

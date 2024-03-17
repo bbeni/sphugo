@@ -42,12 +42,12 @@ type Cell struct {
 	Particles []Particle
 
 	// Bounds of Cell
-	LowerLeft Vec2
+	LowerLeft  Vec2
 	UpperRight Vec2
 
 	// Minimum Bounding Sphere
-	Center Vec2
-	BMinSquared float64
+	BCenter   Vec2
+	BRadiusSq float64
 
 	// Children
 	Lower *Cell
@@ -203,15 +203,20 @@ func (root *Cell) Treebuild (orientation Orientation) {
 	}
 }
 
+
+// Adapted idea from: (might be worse)
+// 1990, Jack Ritter proposed a simple algorithm to find a non-minimal bounding sphere.
+// https://en.wikipedia.org/wiki/Bounding_sphere, 2024
 func (root *Cell) BoundingSpheres() {
 	if root.Upper == nil && root.Lower == nil {
 		if len(root.Particles) == 1 {
-			root.Center = root.Particles[0].Pos
-			root.BMinSquared = 0
+			root.BCenter = root.Particles[0].Pos
+			root.BRadiusSq = 0
 		} else {
 			dSquaredMax := 0.0
 			var pA, pB Vec2
 
+			// naive idea
 			// N^2 time
 			// stupid: double checking
 			for _, p1 := range root.Particles {
@@ -227,8 +232,19 @@ func (root *Cell) BoundingSpheres() {
 
 			// the vector that connects outermost points half
 			rMax := pB.Sub(&pA).Mul(0.5)
-			root.Center = rMax.Add(&pA)
-			root.BMinSquared = rMax.Dot(&rMax)
+			root.BCenter = rMax.Add(&pA)
+			root.BRadiusSq = rMax.Dot(&rMax)
+
+			// step 3: include outliers
+			// naive idea
+			for _, p := range root.Particles {
+				x := root.BCenter.Sub(&p.Pos)
+				rNewSq := x.Dot(&x)
+				if rNewSq > root.BRadiusSq {
+					root.BRadiusSq = rNewSq
+				}
+			}
+
 		}
 	}
 
