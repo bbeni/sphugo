@@ -35,9 +35,9 @@ type Cell struct {
 	Lower *Cell
 	Upper *Cell
 
-	//BoundingBall
+	//Minimum Bounding Sphere
 	Center Vec2
-	BMaxSquared float64
+	BMinSquared float64
 }
 
 func (cell *Cell) DistSquared(to *Vec2) float64 {
@@ -87,7 +87,7 @@ func MakeCellsUniform(nParticles int, ori Orientation) (Cell) {
 	}
 
 	root.Treebuild(ori)
-	root.BoundingBalls()
+	root.BoundingSpheres()
 
 	return root
 }
@@ -186,11 +186,11 @@ func (root *Cell) Treebuild (orientation Orientation) {
 	}
 }
 
-func (root *Cell) BoundingBalls() {
+func (root *Cell) BoundingSpheres() {
 	if root.Upper == nil && root.Lower == nil {
 		if len(root.Particles) == 1 {
 			root.Center = root.Particles[0].Pos
-			root.BMaxSquared = 0
+			root.BMinSquared = 0
 		} else {
 			dSquaredMax := 0.0
 			var pA, pB Vec2
@@ -211,16 +211,16 @@ func (root *Cell) BoundingBalls() {
 			// the vector that connects outermost points half
 			rMax := pB.Sub(&pA).Mul(0.5)
 			root.Center = rMax.Add(&pA)
-			root.BMaxSquared = rMax.Dot(&rMax)
+			root.BMinSquared = rMax.Dot(&rMax)
 		}
 	}
 
 	if root.Upper != nil {
-		root.Upper.BoundingBalls()
+		root.Upper.BoundingSpheres()
 	}
 
 	if root.Lower != nil {
-		root.Lower.BoundingBalls()
+		root.Lower.BoundingSpheres()
 	}
 }
 

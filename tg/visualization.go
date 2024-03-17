@@ -52,22 +52,22 @@ func PlotCells(canvas gx.Canvas, root *Cell, color_index, max_color_index int) {
 }
 
 // Draw Bounding Circles of leaf nodes in Cell
-func PlotBalls (c gx.Canvas, root *Cell, color gx.Color) {
+func PlotBoundingCircles (c gx.Canvas, root *Cell, color gx.Color) {
 
 	if root.Upper == nil && root.Lower == nil {
 
 		x := float32(root.Center.X*float64(c.W))
 		y := float32(root.Center.Y*float64(c.H))
-		r := float32(math.Sqrt(root.BMaxSquared)) * float32(c.W) // incorrect: use width for now
+		r := float32(math.Sqrt(root.BMinSquared)) * float32(c.W) // incorrect: use width for now
 
 		c.DrawCircle(x, y, r, 1.0, color)
 	}
 
 	if root.Upper != nil {
-		PlotBalls(c, root.Upper, color)
+		PlotBoundingCircles(c, root.Upper, color)
 	}
 
 	if root.Lower != nil {
-		PlotBalls(c, root.Lower, color)
+		PlotBoundingCircles(c, root.Lower, color)
 	}
 }

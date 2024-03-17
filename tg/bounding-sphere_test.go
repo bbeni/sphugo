@@ -10,7 +10,7 @@ import (
 
 func Test1(t *testing.T) {
 
-	cell := MakeCellUniform(60)
+	//cell := MakeCellUniform(60)
 
 
 }

@@ -92,14 +92,14 @@ func (pq PrioQ) FindMin() (value PrioQValue, ok bool) {
 
 func main() {
 	root := tg.MakeCellsUniform(60, tg.Vertical)
-	root.BoundingBalls()
+	root.BoundingSpheres()
 
 
 	w, h := 1000, 1000
 	canvas := gx.NewCanvas(w, h)
 	canvas.Clear(gx.BLACK)
 
-	tg.PlotBalls(canvas, &root, gx.RED)
+	tg.PlotBoundingCircles(canvas, &root, gx.RED)
 
 	for _, p := range root.Particles {
 		x, y := p.Pos.X*float64(w), p.Pos.Y*float64(h)
