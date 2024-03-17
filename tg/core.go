@@ -23,48 +23,6 @@ const (
 	TREE_PNG_FNAME = "tree.png"
 )
 
-// Math functions for int
-func Abs(x int) int {
-	if x < 0 { return -x }
-	return x
-}
-
-func Max(x, y int) int {
-	if x >= y {return x}
-	return y
-}
-
-func Min(x, y int) int {
-	if x <= y {return x}
-	return y
-}
-
-// Linear algebra
-type Vec2i struct {
-	X, Y int
-}
-
-type Vec2 struct {
-	X, Y float64
-}
-
-func (v *Vec2) Add(other *Vec2) Vec2 {
-	return Vec2{v.X + other.X, v.Y + other.Y}
-}
-
-func (v *Vec2) Sub(other *Vec2) Vec2 {
-	return Vec2{v.X - other.X, v.Y - other.Y}
-}
-
-func (v *Vec2) Dot(other *Vec2) float64 {
-	return v.X*other.X + v.Y*other.Y
-}
-
-func (v Vec2) Mul(f float64) Vec2 {
-	return Vec2{v.X*f, v.Y*f}
-}
-
-
 type Particle struct {
 	Pos, Vel Vec2
 	Rho float64
@@ -114,6 +72,28 @@ func InitUniformly(particles []Particle) {
 		particles[i].Pos = Vec2{rand.Float64(), rand.Float64()}
 		particles[i].Rho = 1
 	}
+}
+
+
+func MakeCellsUniform(nParticles int, ori Orientation) (Cell) {
+	particles := make([]Particle, nParticles)
+
+	InitUniformly(particles[:])
+
+	root := Cell{
+		LowerLeft: Vec2{0, 0},
+		UpperRight: Vec2{1, 1},
+		Particles: particles[:],
+	}
+
+	root.Treebuild(ori)
+	root.BoundingBalls()
+
+	return root
+}
+
+func MakeCell(numberParticles int, initalizer func(index int) Vec2 ) (root *Cell) {
+	panic("Not Implemented")
 }
 
 

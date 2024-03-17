@@ -19,9 +19,8 @@ package main
 
 import (
 	"github.com/bbeni/treego/tg"
-	"math"
+	"github.com/bbeni/treego/gx"
 )
-
 
 type PrioQValue tg.Cell
 
@@ -92,53 +91,22 @@ func (pq PrioQ) FindMin() (value PrioQValue, ok bool) {
 }
 
 func main() {
-	particles := make([]tg.Particle, 60)
-	tg.InitUniformly(particles)
-
-	root := tg.Cell{
-		LowerLeft: tg.Vec2{0, 0},
-		UpperRight: tg.Vec2{1, 1},
-		Particles: particles[:],
-	}
-
-	root.Treebuild(tg.Vertical)
+	root := tg.MakeCellsUniform(60, tg.Vertical)
 	root.BoundingBalls()
 
 
 	w, h := 1000, 1000
-	c := tg.NewCanvas(w, h)
-	c.Clear(tg.BLACK)
+	canvas := gx.NewCanvas(w, h)
+	canvas.Clear(gx.BLACK)
 
-	var PlotBalls func (root *tg.Cell)
+	tg.PlotBalls(canvas, &root, gx.RED)
 
-	PlotBalls = func (root *tg.Cell) {
-		if root.Upper == nil && root.Lower == nil {
-
-			x := float32(root.Center.X*float64(w))
-			y := float32(root.Center.Y*float64(h))
-			r := float32(math.Sqrt(root.BMaxSquared)) * float32(w)
-
-			c.DrawCircle(x, y, r, 1.0, tg.BLUE)
-		}
-
-		if root.Upper != nil {
-			PlotBalls(root.Upper)
-		}
-
-		if root.Lower != nil {
-			PlotBalls(root.Lower)
-		}
-	}
-
-
-	PlotBalls(&root)
-
-	for _, p := range particles {
-
+	for _, p := range root.Particles {
 		x, y := p.Pos.X*float64(w), p.Pos.Y*float64(h)
-		c.DrawDisk(float32(x), float32(y), 2.4, tg.GREEN)
+		canvas.DrawDisk(float32(x), float32(y), 2.4, gx.GREEN)
 	}
-	c.AsPNG("test.png")
+
+	canvas.AsPNG("test.png")
 
 }
 
