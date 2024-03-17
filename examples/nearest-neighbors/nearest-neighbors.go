@@ -94,20 +94,19 @@ func main() {
 	root := tg.MakeCellsUniform(60, tg.Vertical)
 	root.BoundingSpheres()
 
-
 	w, h := 1000, 1000
 	canvas := gx.NewCanvas(w, h)
 	canvas.Clear(gx.BLACK)
 
 	tg.PlotBoundingCircles(canvas, &root, gx.RED)
+	tg.PlotCells(canvas, &root, 0, root.Depth())
 
 	for _, p := range root.Particles {
 		x, y := p.Pos.X*float64(w), p.Pos.Y*float64(h)
 		canvas.DrawDisk(float32(x), float32(y), 2.4, gx.GREEN)
 	}
 
-	canvas.AsPNG("test.png")
-
+	canvas.ToPNG("test.png")
 }
 
 /*

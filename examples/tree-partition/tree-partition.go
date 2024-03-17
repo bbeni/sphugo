@@ -9,7 +9,6 @@ For more info and implementation details see tg/tree-partition.go
 package main
 
 import (
-	"fmt"
 	"github.com/bbeni/treego/tg"
 )
 
@@ -43,7 +42,7 @@ func main() {
 	root.Treebuild(tg.Vertical)
 	//root.Dumptree(0)
 
-	tg.MakeTreePng(root.Particles[:], &root)
-	fmt.Printf("Created %s\n", TREE_PNG_FNAME)
+	canvas := tg.MakeTreePlot(&root, IMAGE_W, IMAGE_H)
+	canvas.ToPNG(TREE_PNG_FNAME)
 
 }

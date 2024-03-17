@@ -8,7 +8,7 @@ Example code:
 	canvas.Clear(gx.BLACK)
 	canvas.DrawCircle(100,100,50,10,gx.WHITE)
 	canvas.DrawDisk(150,150,30,gx.RED)
-	canvas.AsPNG("test.png")
+	canvas.ToPNG("test.png")
 */
 package gx
 
@@ -88,7 +88,7 @@ func (c Canvas) DrawDisk(cx, cy, radius float32, color Color) {
 	}
 }
 
-func (c Canvas) AsPNG(file_path string) {
+func (c Canvas) ToPNG(file_path string) {
 
 	file, err := os.Create(file_path)
 	if err != nil {
@@ -102,6 +102,8 @@ func (c Canvas) AsPNG(file_path string) {
 		log.Fatalf("Error: couldn't encode PNG %q : %q", file_path, err)
 		os.Exit(1)
 	}
+
+	log.Printf("Created PNG %s.", file_path)
 }
 
 func Max(x, y int) int {

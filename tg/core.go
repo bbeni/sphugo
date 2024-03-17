@@ -24,20 +24,37 @@ const (
 )
 
 type Particle struct {
-	Pos, Vel Vec2
+	Pos Vec2
+	Vel Vec2
 	Rho float64
+	C float64     // Speed of sound
+	E float64     // Specific internal energy
+	H float64     // NN parameter
+
+	// Temporary values filled by Simulation
+	EDot float64  // dE/dt
+	VDot Vec2     // Acceleration
+	EPred float64 // Predicted internal energy
+	VPred Vec2    // Predicted Velicty
 }
 
 type Cell struct {
+	Particles []Particle
+
+	// Bounds of Cell
 	LowerLeft Vec2
 	UpperRight Vec2
-	Particles []Particle
+
+	// Minimum Bounding Sphere
+	Center Vec2
+	BMinSquared float64
+
+	// Children
 	Lower *Cell
 	Upper *Cell
 
-	//Minimum Bounding Sphere
-	Center Vec2
-	BMinSquared float64
+	// Parent
+	Parent *Cell
 }
 
 func (cell *Cell) DistSquared(to *Vec2) float64 {
@@ -236,9 +253,9 @@ func (root *Cell) Dumptree(level int) {
 	}
 }
 
-func (root *Cell) Countlevel() int {
+func (root *Cell) Depth() int {
 	a, b := 0, 0
-	if root.Upper != nil { a = root.Upper.Countlevel() }
-	if root.Lower != nil { b = root.Lower.Countlevel() }
+	if root.Upper != nil { a = root.Upper.Depth() }
+	if root.Lower != nil { b = root.Lower.Depth() }
 	return Max(a, b) + 1
 }

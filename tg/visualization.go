@@ -6,18 +6,18 @@ import (
 	"math"
 )
 
-func MakeTreePng(particles []Particle, root* Cell) {
+func MakeTreePlot(root* Cell, w, h int) (gx.Canvas) {
 
-	var canvas = gx.NewCanvas(IMAGE_W, IMAGE_H)
+	var canvas = gx.NewCanvas(w, h)
 	canvas.Clear(gx.BLACK)
 
 	// Draw the compartiment cells
-	PlotCells(canvas, root, 0, root.Countlevel())
+	PlotCells(canvas, root, 0, root.Depth())
 
 	// Draw all particles in white
-	for _, particle := range particles {
+	for _, particle := range root.Particles {
 		x := int(particle.Pos.X * float64(canvas.W))
-		y := int(particle.Pos.Y * float64(canvas.W))
+		y := int(particle.Pos.Y * float64(canvas.H))
 		canvas.DrawPoint(x, y, gx.WHITE)
 	}
 
@@ -27,8 +27,7 @@ func MakeTreePng(particles []Particle, root* Cell) {
 		upper_right := gx.Vec2i{i, IMAGE_H-10}
 		canvas.DrawLine(lower_left, upper_right, gx.RainbowRamp(uint8(i)))
 	}
-
-	canvas.AsPNG(TREE_PNG_FNAME)
+	return canvas
 }
 
 
