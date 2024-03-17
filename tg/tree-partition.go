@@ -1,13 +1,9 @@
 package tg
 
 import (
-	"os"
 	"fmt"
 	"math/rand"
-	"log"
-	"image"
-	"image/png"
-	"image/color"
+	"math"
 	"time"
 )
 
@@ -52,6 +48,22 @@ type Vec2 struct {
 	X, Y float64
 }
 
+func (v *Vec2) Add(other *Vec2) Vec2 {
+	return Vec2{v.X + other.X, v.Y + other.Y}
+}
+
+func (v *Vec2) Sub(other *Vec2) Vec2 {
+	return Vec2{v.X - other.X, v.Y - other.Y}
+}
+
+func (v *Vec2) Dot(other *Vec2) float64 {
+	return v.X*other.X + v.Y*other.Y
+}
+
+func (v Vec2) Mul(f float64) Vec2 {
+	return Vec2{v.X*f, v.Y*f}
+}
+
 
 type Particle struct {
 	Pos, Vel Vec2
@@ -62,8 +74,20 @@ type Cell struct {
 	LowerLeft Vec2
 	UpperRight Vec2
 	Particles []Particle
-	lower *Cell
-	upper *Cell
+	Lower *Cell
+	Upper *Cell
+
+	//BoundingBall
+	Center Vec2
+	BMaxSquared float64
+}
+
+func (cell *Cell) DistSquared(to *Vec2) float64 {
+	d1 := to.Sub(&cell.UpperRight)
+	d2 := cell.LowerLeft.Sub(to)
+	maxx := math.Max(d1.X, d2.X)
+	maxy := math.Max(d1.Y, d2.Y)
+	return maxx*maxx + maxy*maxy
 }
 
 type Orientation int
@@ -146,168 +170,95 @@ func (root *Cell) Treebuild (orientation Orientation) {
 	a, b := Partition(root.Particles, orientation, mid)
 	
 	if len(a) > 0 {
-		root.lower = &Cell{
+		root.Lower = &Cell{
 			Particles: a,
 			LowerLeft: root.LowerLeft,
 			UpperRight: root.UpperRight,
 		}
 
 		if orientation == Vertical {
-			root.lower.UpperRight.Y = mid
+			root.Lower.UpperRight.Y = mid
 		} else {
-			root.lower.UpperRight.X = mid
+			root.Lower.UpperRight.X = mid
 		}
 
 		if len(a) > MAX_PARTICLES_PER_CELL {
-			root.lower.Treebuild(orientation.other())
+			root.Lower.Treebuild(orientation.other())
 		}
 	}
 
 	if len(b) > 0 {
-		root.upper = &Cell{
+		root.Upper = &Cell{
 			Particles: b,
 			LowerLeft: root.LowerLeft,
 			UpperRight: root.UpperRight,
 		}
 
 		if orientation == Vertical {
-			root.upper.LowerLeft.Y = mid
+			root.Upper.LowerLeft.Y = mid
 		} else {
-			root.upper.LowerLeft.X = mid
+			root.Upper.LowerLeft.X = mid
 		}
 
 		if len(b) > MAX_PARTICLES_PER_CELL {
-			root.upper.Treebuild(orientation.other())
+			root.Upper.Treebuild(orientation.other())
 		}
 	}
 }
 
+func (root *Cell) BoundingBalls() {
+	if root.Upper == nil && root.Lower == nil {
+		if len(root.Particles) == 1 {
+			root.Center = root.Particles[0].Pos
+			root.BMaxSquared = 0
+		} else {
+			dSquaredMax := 0.0
+			var pA, pB Vec2
+
+			// N^2 time
+			// stupid: double checking
+			for _, p1 := range root.Particles {
+				for _, p2 := range root.Particles {
+					x := p2.Pos.Sub(&p1.Pos)
+					dSq := x.Dot(&x)
+					if dSq > dSquaredMax {
+						dSquaredMax = dSq
+						pA, pB = p1.Pos, p2.Pos
+					}
+				}
+			}
+
+			// the vector that connects outermost points half
+			rMax := pB.Sub(&pA).Mul(0.5)
+			root.Center = rMax.Add(&pA)
+			root.BMaxSquared = rMax.Dot(&rMax)
+		}
+	}
+
+	if root.Upper != nil {
+		root.Upper.BoundingBalls()
+	}
+
+	if root.Lower != nil {
+		root.Lower.BoundingBalls()
+	}
+}
+
+
 func (root *Cell) Dumptree(level int) {
 	for i := 0; i < level; i++ { fmt.Print("  ") }
 	fmt.Println(root.LowerLeft, root.UpperRight)
-	if root.upper != nil {
-		root.upper.Dumptree(level + 1)
+	if root.Upper != nil {
+		root.Upper.Dumptree(level + 1)
 	}
-	if root.lower != nil {
-		root.lower.Dumptree(level + 1)
+	if root.Lower != nil {
+		root.Lower.Dumptree(level + 1)
 	}
 }
 
 func (root *Cell) Countlevel() int {
 	a, b := 0, 0
-	if root.upper != nil { a = root.upper.Countlevel() }
-	if root.lower != nil { b = root.lower.Countlevel() }
+	if root.Upper != nil { a = root.Upper.Countlevel() }
+	if root.Lower != nil { b = root.Lower.Countlevel() }
 	return Max(a, b) + 1
-}
-
-
-// index 0 to 255 gives a rainbow
-func rainbow_ramp(index uint8) (color.NRGBA){
-	x := int(index)
-	r := Max(Max(Min(255, 620 - 4 * x), 0), 2 * x - 400)
-	g := Max(Min(Min(255, 3 * x), 820 - 4 * x), 0)
-	b := Min(Max(0, 4 * x - 620), 255)
-	return color.NRGBA{
-		R: uint8(r), G: uint8(g), B: uint8(b), A: 255,
-	}
-}
-
-func draw_line(img *image.NRGBA, a, b Vec2i, color color.NRGBA) {
-
-	delta_x := b.X - a.X
-	delta_y := b.Y - a.Y
-
-	step_x := 1
-	if delta_x < 0 { step_x = -1 }
-
-	step_y := 1
-	if delta_y < 0 { step_y = -1 }
-
-	if delta_x == 0 && delta_y == 0 {
-		img.Set(a.X, a.Y, color)
-		return
-	}
-
-	if Abs(delta_x) >= Abs(delta_y) {
-		for i := range (Abs(delta_x) + 1) {
-			x := b.X - step_x * i
-			y := b.Y - int(float64(delta_y * i * step_x) / float64(delta_x))
-			img.Set(x, y, color)
-		}
-	} else {
-		for i := range (Abs(delta_y) + 1) {
-			y := b.Y - step_y * i
-			x := b.X - int(float64(delta_x * i * step_y) / float64(delta_y))
-			img.Set(x, y, color)
-		}
-	}
-}
-
-func draw_quad(img *image.NRGBA, x1, y1, x2, y2 int, color color.NRGBA) {
-	draw_line(img, Vec2i{x1, y1}, Vec2i{x2, y1}, color)
-	draw_line(img, Vec2i{x2, y1}, Vec2i{x2, y2}, color)
-	draw_line(img, Vec2i{x2, y2}, Vec2i{x1, y2}, color)
-	draw_line(img, Vec2i{x1, y2}, Vec2i{x1, y1}, color)
-}
-
-func draw_cells(img *image.NRGBA, w, h int, root *Cell, level, max_level int) {
-	x1 := int(root.LowerLeft.X * float64(w))
-	y1 := int(root.LowerLeft.Y * float64(h))
-	x2 := int(root.UpperRight.X * float64(w))
-	y2 := int(root.UpperRight.Y * float64(h))
-
-	if root.lower != nil {
-		draw_cells(img, w, h, root.lower, level + 1, max_level)
-	}
-
-	if root.upper != nil {
-		draw_cells(img, w, h, root.upper, level + 1, max_level)
-	}
-
-	color_index := uint8(level*256/max_level)
-	draw_quad(img, x1, y1, x2 - 1, y2 - 1, rainbow_ramp(color_index))
-}
-
-func MakeTreePng(particles []Particle, root* Cell) {
-
-	const w, h = IMAGE_W, IMAGE_H
-	black := color.NRGBA{R: 0, G: 0, B: 0, A: 255}
-	white := color.NRGBA{R: 255, G: 255, B: 255, A: 255}
-
-	img := image.NewNRGBA(image.Rect(0, 0, w, h))
-
-	// Black Background
-	for y := 0; y < h; y++ {
-		for x := 0; x < w; x++ {
-			img.Set(x, y, black)
-		}
-	}
-
-	// Draw the compartiment cells
-	draw_cells(img, w, h, root, 0, root.Countlevel())
-
-	// Draw all particles in white
-	for _, particle := range particles {
-		x := int(particle.Pos.X * w)
-		y := int(particle.Pos.Y * w)
-		img.Set(x, y, white)
-	}
-
-	// draw a rainbow on lower left corner
-	for i := range 256 {
-		draw_line(img, Vec2i{i, IMAGE_H}, Vec2i{i, IMAGE_H-10}, rainbow_ramp(uint8(i)))
-	}
-
-	file, err := os.Create(TREE_PNG_FNAME)
-	if err != nil {
-		log.Fatalf("Error: couldn't create file %q : %q", TREE_PNG_FNAME, err)
-		os.Exit(1)
-	}
-	defer file.Close()
-
-	err = png.Encode(file, img)
-	if err != nil {
-		log.Fatalf("Error: couldn't encode PNG %q : %q", TREE_PNG_FNAME, err)
-		os.Exit(1)
-	}
 }

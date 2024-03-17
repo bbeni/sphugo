@@ -25,7 +25,6 @@ package tg
 
 import (
 	"fmt"
-	"math/rand"
 	"cmp"
 	"strings"
 	"errors"
@@ -33,10 +32,8 @@ import (
 
 /* Heap indexed in the following way:
 	i parent
-		-> (i+1)*2-1 left  child
-		-> (i+1)*2   right child */
-
-const ARRAY_CAP = 1024 // Dynamic array initial capacity
+		-> i*2 + 1   left  child
+		-> i*2 + 2   right child */
 
 /* Heapify()
 
@@ -51,8 +48,8 @@ tail recursive so we are using loop instead of recursive solution */
 
 func Heapify[T cmp.Ordered](array []T, i int) {
 	for {
-		l := (i + 1) * 2 - 1
-		r := (i + 1) * 2
+		l := i*2 + 1
+		r := i*2 + 2
 		min_index := i
 
 		if l < len(array) && array[l] < array[min_index] {
