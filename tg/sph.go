@@ -34,7 +34,7 @@ func MakeSimulation() (Simulation){
 // SPH
 func (sim Simulation) Run() {
 
-	// TODO: check if simulation initialized
+	// TODO(#2): check if simulation initialized
 
 	// initialization drift dt=0
 	for _, p := range sim.Root.Particles {
