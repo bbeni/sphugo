@@ -82,7 +82,7 @@ func (sim Simulation) CalculateForces() {
 
 	// Calculate Nearest Neighbor Density Rho
 	{
-		// TODO: implement NN density
+		// TODO(#3): implement NN density
 	}
 
 	// Calculate speed of sound
