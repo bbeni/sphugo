@@ -9,19 +9,19 @@ import (
 
 // Configuration
 const (
-	N_PARTICLES = 2200
-	MAX_PARTICLES_PER_CELL = 8
-	SPLIT_FRACTION = 0.5       // Fraction of left to total space for Treebuild(), usually 0.5.
-	USE_RANDOM_SEED = false    // for generating randomly distributed particles in init_uniformly()
+	N_PARTICLES 			= 2200
+	MAX_PARTICLES_PER_CELL  = 8
+	SPLIT_FRACTION 			= 0.5   // Fraction of left to total space for Treebuild(), usually 0.5.
+	USE_RANDOM_SEED 		= false // for generating randomly distributed particles in init_uniformly()
+	NN_SIZE 				= 32    // Nearest Neighbour Size
 )
 
-// Image generation config
-const (
-	IMAGE_W = 512*2
-	IMAGE_H = 512*2
-	RECT_OFFSET = 1  // Pixel offset for upper right corner in negative x and y direction
-	TREE_PNG_FNAME = "tree.png"
-)
+// For 10 Mio particles
+// 10 000 000 * 104 bytes ~~ 1.3 GB
+// 10 000 000 * 512
+// 1 byte = 8 bit
+// 8 byte = 64 bit
+// 16+16+32+8+16+8+16 = 104
 
 type Particle struct {
 	Pos Vec2
@@ -36,6 +36,15 @@ type Particle struct {
 	VDot Vec2     // Acceleration
 	EPred float64 // Predicted internal energy
 	VPred Vec2    // Predicted Velicty
+	// 104 bytes until now
+
+	// @Speed might be bad because we have a big particle size now
+	// should rather keep it seperate to prevent cache misses?
+	// for now we just naively implement it like this
+	// 32*8*2  = 512 bytes
+	NearestNeighbours     [NN_SIZE]*Particle
+	NearestNeighbourDists [NN_SIZE]float64
+	// 616 bytes until now
 }
 
 // Tree structure every leaf holds

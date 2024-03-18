@@ -26,7 +26,7 @@ func MakeSimulation() (Simulation){
 
 	sim.DeltaTHalf = 0.01
 
-	sim.Root = MakeCellsUniform(10_000, Vertical)
+	sim.Root = MakeCellsUniform(10_000_000, Vertical)
 
 	return sim
 }
@@ -44,6 +44,7 @@ func (sim Simulation) Run() {
 
 	sim.CalculateForces()
 
+	// @Leak Memory grows at every step, don't know why...
 	for step := range sim.NSteps {
 
 		// drift 1 for leapfrog dt/2
@@ -79,6 +80,7 @@ func (sim Simulation) CalculateForces() {
 
 	// rebuild the tree to perserve data locality
 	sim.Root.Treebuild(Vertical)
+	sim.Root.BoundingSpheres()
 
 	// Calculate Nearest Neighbor Density Rho
 	{

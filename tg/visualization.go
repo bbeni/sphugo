@@ -23,8 +23,8 @@ func MakeTreePlot(root* Cell, w, h int) (gx.Canvas) {
 
 	// draw a rainbow on lower left corner
 	for i := range 256 {
-		lower_left := gx.Vec2i{i, IMAGE_H}
-		upper_right := gx.Vec2i{i, IMAGE_H-10}
+		lower_left := gx.Vec2i{i, h}
+		upper_right := gx.Vec2i{i, h-10}
 		canvas.DrawLine(lower_left, upper_right, gx.RainbowRamp(uint8(i)))
 	}
 	return canvas
