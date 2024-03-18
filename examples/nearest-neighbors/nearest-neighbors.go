@@ -20,6 +20,7 @@ package main
 import (
 	"github.com/bbeni/treego/tg"
 	"github.com/bbeni/treego/gx"
+	"fmt"
 )
 
 type PrioQValue tg.Cell
@@ -91,6 +92,25 @@ func (pq PrioQ) FindMin() (value PrioQValue, ok bool) {
 }
 
 func main() {
+	// 10 Mio takes 1300 MB of memery
+	root := tg.MakeCellsUniform(10_000_000, tg.Vertical)
+	fmt.Println("Tree Depth:", root.Depth(), ", number of particles: ", len(root.Particles))
+
+	root.Treebuild(tg.Horizontal)
+	root.BoundingSpheres()
+	fmt.Println("Tree rebuilt")
+
+	root.Treebuild(tg.Vertical)
+	root.BoundingSpheres()
+	fmt.Println("Tree rebuilt")
+
+	root.Treebuild(tg.Horizontal)
+	root.BoundingSpheres()
+	fmt.Println("Tree rebuilt")
+
+}
+
+func main1() {
 	root := tg.MakeCellsUniform(60, tg.Vertical)
 	root.BoundingSpheres()
 

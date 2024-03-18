@@ -26,7 +26,7 @@ const (
 type Particle struct {
 	Pos Vec2
 	Vel Vec2
-	Rho float64
+	Rho float64   // Density
 	C float64     // Speed of sound
 	E float64     // Specific internal energy
 	H float64     // NN parameter
@@ -38,6 +38,8 @@ type Particle struct {
 	VPred Vec2    // Predicted Velicty
 }
 
+// Tree structure every leaf holds
+// at most MAX_PARTICLES_PER_CELL
 type Cell struct {
 	Particles []Particle
 

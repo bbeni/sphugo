@@ -37,7 +37,7 @@ func (v *Vec2) Sub(other *Vec2) Vec2 {
 }
 
 func (v *Vec2) Dot(other *Vec2) float64 {
-	return v.X*other.X + v.Y*other.Y
+	return v.X * other.X + v.Y * other.Y
 }
 
 func (v Vec2) Mul(f float64) Vec2 {

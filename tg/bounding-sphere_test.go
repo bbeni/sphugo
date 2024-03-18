@@ -1,14 +1,8 @@
-/*
-
-*/
-
 package tg
 
 import (
 	"testing"
-	//"fmt"
 )
-
 
 func isInsideAny(pos Vec2, cell *Cell) bool {
 
