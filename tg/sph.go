@@ -15,7 +15,7 @@ type Simulation struct {
 }
 
 
-// TODO: Make it more customizable
+// TODO(#1): Make it more customizable
 func MakeSimulation() (Simulation){
 
 	var sim Simulation
