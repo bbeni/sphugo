@@ -98,7 +98,7 @@ func (sim Simulation) CalculateForces() {
 	// Calculate Nearest Neighbor SPH forces
 	// VDot, EDot
 	{
-		// TODO: implement NN forces
+		// TODO(#4): implement NN forces
 	}
 
 }
