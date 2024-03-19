@@ -2,7 +2,7 @@
 package tg
 
 import (
-	"github.com/bbeni/treego/gx"
+	"github.com/bbeni/sphugo/gx"
 )
 
 func MakeTreePlot(root* Cell, w, h int) (gx.Canvas) {

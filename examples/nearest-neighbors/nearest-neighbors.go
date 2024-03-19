@@ -14,8 +14,8 @@ Goal:
 package main
 
 import (
-	"github.com/bbeni/treego/tg"
-	"github.com/bbeni/treego/gx"
+	"github.com/bbeni/sphugo/tg"
+	"github.com/bbeni/sphugo/gx"
 	"math"
 )
 

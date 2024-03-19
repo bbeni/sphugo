@@ -4,7 +4,7 @@ import (
 	"math"
 	"log"
 	"fmt"
-	"github.com/bbeni/treego/gx"
+	"github.com/bbeni/sphugo/gx"
 )
 
 type Simulation struct {
@@ -109,7 +109,7 @@ func (sim *Simulation) Run() {
 			canvas.DrawDisk(float32(x), float32(y), float32(particle.Rho*2), gx.SKYBLUE_OPAQUE)
 		}
 
-		//canvas.ToPNG(fmt.Sprintf("./out/%.4v.png", step))
+		canvas.ToPNG(fmt.Sprintf("./out/%.4v.png", step))
 	}
 
 }

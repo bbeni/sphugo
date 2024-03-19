@@ -1,8 +1,10 @@
-# ESC 202 Simulations
+# SPH Simulations (ESC 202 Course UZH)
 
-My attempt at the assignments at ESC 202 course at UZH written in [GO](https://go.dev/ "Go Language"). 🦆 The Goal seems to be to have a working Smooth Particle Hydrodynamics code. Go as a language was chosen to easily parallelize the simulation and have fast compiled code.
+SPHUGO - SPH Using GO - Source code available at (www.github.com/bbeni/sphugo)
 
-## 1. Example - Binary Partition 2d Particles
+My attempt at the assignments at ESC 202 course at UZH written in [GO](https://go.dev/ "Go Language"). 🦆 The Goal is to have a working Smooth Particle Hydrodynamics (SPH) code. GO as a language was chosen to easily parallelize the simulation and have fast execution times comparable to C/C++. There are 5 tasks leading up to the simulation. The following sections should provide documentation of the implementation process.
+
+## 1. Task - Binary Partition 2d Particles
 
 Goal:
 
@@ -32,9 +34,18 @@ A png picture is generated from a tree with the MakeTreePng() function. The foll
 
 ![](tree.png)
 
-## 2. Example - Heap Implementation
 
-Showcase BuildHeap, Insert, ExtractMin, Replace functionality. Dumptree function used for visualizing the tree in terminal (text form) and check for correctness.
+## 2. Task - Nearest Neigbours
+
+Goal:
+
+>Implement the k nearest neighbor search. Use the priority queue given in the Python template and implement “replace” and “key” functions. Use the particle to cell distance function from the lecture notes or the celldist2() given in the Python template. Are they the same? Optional: Also implement the ball search algorithm given in the lecture notes.
+
+First a heap data structure was implemented to later use as a priority queue for searching the nearest neighbours.
+
+### Heap Implementation
+
+Showcase BuildHeap, Insert, ExtractMin, Replace functionality. The Dumptree function is used for visualizing the tree in terminal (text form) and check for correctness.
 
 ```console
 go run ./examples/heap/
@@ -122,24 +133,17 @@ Replace with 33 with root node:
 
 ```
 
-## 3. Nearest Neigbours
-
-Goal:
-
->Implement the k nearest neighbor search. Use the priority queue given in the Python template and implement “replace” and “key” functions. Use the particle to cell distance function from the lecture notes or the celldist2() given in the Python template. Are they the same? Optional: Also implement the ball search algorithm given in the lecture notes.
-
-
-The function `FindNearestNeighbours()` acts on one Particle and uses a Prority Queue, implemented similarly to the Heap shown before, to find the lowest distance Neighbours. NN_SIZE=32 constant defines the nearest neighbour count.
+The function `FindNearestNeighbours()` acts on one Particle and uses a prority queue, implemented similarly to the heap shown before, to find the lowest distance neighbours. The NN_SIZE=32 constant defines the nearest neighbours count.
 
 ```console
 go run ./examples/nearest-neighbours/
 ```
 
-It generates two images with 220 particles. The first shows the non periodic version of the particle.FindNearestNeighbour function. The tree cells are also shown in red.
+It generates two images with 220 particles. One random particle is chosen and the 32 nearest neighbours are displayed in gree. The first picture shows the non periodic version of the particle.FindNearestNeighbours function. The tree cells are also shown in red:
 
 ![](nearest_neighbours.png)
 
-The periodic visualization inculeds a the bounding 'spheres' of each tree cell instead of the tree cell.
+The periodic visualization includes the bounding 'sphere' of each tree cell leaf instead of the tree cells:
 
 ![](nearest_neighbours_periodic.png)
 

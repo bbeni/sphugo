@@ -9,7 +9,7 @@ For more info and implementation details see tg/tree-partition.go
 package main
 
 import (
-	"github.com/bbeni/treego/tg"
+	"github.com/bbeni/sphugo/tg"
 )
 
 // Configuration

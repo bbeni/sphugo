@@ -1,3 +1,3 @@
-module github.com/bbeni/treego
+module github.com/bbeni/sphego
 
 go 1.22.1

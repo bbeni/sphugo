@@ -11,7 +11,7 @@ package main
 import (
 	"fmt"
 	"math/rand"
-	"github.com/bbeni/treego/tg"
+	"github.com/bbeni/sphugo/tg"
 )
 
 /* Heap indexed in the following way:
