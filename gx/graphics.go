@@ -18,6 +18,7 @@ import (
 	"image"
 	"image/png"
 	"image/color"
+	"math"
 )
 
 type Color = color.NRGBA
@@ -29,6 +30,10 @@ var (
 	GREEN = color.NRGBA{R: 0, G: 255, B: 0, A: 255}
 	BLUE = color.NRGBA{R: 0, G: 0, B: 255, A: 255}
 	ORANGE = color.NRGBA{R: 255, G: 165, B: 0, A: 255}
+
+	SKYBLUE_PALE = color.NRGBA{204, 255, 255, 255}
+	SKYBLUE_OPAQUE = color.NRGBA{128, 204, 204, 255}
+	SKYBLUE = color.NRGBA{178, 255, 255, 255}
 )
 
 type Vec2i struct{
@@ -62,9 +67,14 @@ func (c Canvas) DrawPoint(x, y int, color Color) {
 }
 
 func (c Canvas) DrawCircle(cx, cy, radius, border float32, color Color) {
-	// stupid approach...
-	for y := range c.H {
-		for x:= range c.W {
+
+	xa := int(math.Floor(float64(cx - radius)))
+	xb := int(math.Ceil(float64(cx + radius)))
+	ya := int(math.Floor(float64(cy - radius)))
+	yb := int(math.Ceil(float64(cy + radius)))
+
+	for x:=xa; x <= xb; x++ {
+		for y:=ya; y <= yb; y++ {
 			dx := float32(x) - cx
 			dy := float32(y) - cy
 			rSquared := dx*dx + dy*dy
@@ -76,9 +86,14 @@ func (c Canvas) DrawCircle(cx, cy, radius, border float32, color Color) {
 }
 
 func (c Canvas) DrawDisk(cx, cy, radius float32, color Color) {
-	// stupid approach...
-	for y := range c.H {
-		for x:= range c.W {
+
+	xa := int(math.Floor(float64(cx - radius)))
+	xb := int(math.Ceil(float64(cx + radius)))
+	ya := int(math.Floor(float64(cy - radius)))
+	yb := int(math.Ceil(float64(cy + radius)))
+
+	for x:=xa; x <= xb; x++ {
+		for y:=ya; y <= yb; y++ {
 			dx := float32(x) - cx
 			dy := float32(y) - cy
 			rSquared := dx*dx + dy*dy

@@ -84,8 +84,12 @@ func InitUniformly(particles []Particle) {
 	for i, _ := range particles {
 		particles[i].Pos = Vec2{rand.Float64(), rand.Float64()}
 		particles[i].Pos = Vec2{rand.Float64(), rand.Float64()}
-		particles[i].Rho = 1
 	}
+	for i, _ := range particles {
+		particles[i].Rho = rand.Float64()*6 + 1.0
+		particles[i].Vel = Vec2{rand.Float64()*0.05, rand.Float64()*0.05}
+	}
+
 }
 
 
@@ -157,6 +161,13 @@ func Partition (ps []Particle, orientation Orientation, middle float64) (a, b []
 // mayne the bug is even in Partition ?
 func (root *Cell) Treebuild (orientation Orientation) {
 	
+
+	// dirty fix: particles out of [0, 1] x [0, 1] will grow cells indefinitely
+	// MAX_PARTICLES_PER_CELL not satisfied...
+	if root.LowerLeft.Y == root.UpperRight.Y && root.LowerLeft.X == root.UpperRight.X {
+		return
+	}
+
 	var mid float64
 	if orientation == Vertical {
 		mid = SPLIT_FRACTION * root.LowerLeft.Y + (1 - SPLIT_FRACTION) * root.UpperRight.Y
@@ -179,7 +190,7 @@ func (root *Cell) Treebuild (orientation Orientation) {
 			root.Lower.UpperRight.X = mid
 		}
 
-		if len(a) > MAX_PARTICLES_PER_CELL {
+		if len(a) > MAX_PARTICLES_PER_CELL{
 			root.Lower.Treebuild(orientation.other())
 		}
 	}

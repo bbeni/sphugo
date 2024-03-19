@@ -3,9 +3,8 @@ package tg
 import (
 	"math"
 	"log"
-//	"time"
-//	"fmt"
-//	"github.com/bbeni/treego/gx"
+	"fmt"
+	"github.com/bbeni/treego/gx"
 )
 
 type Simulation struct {
@@ -25,15 +24,11 @@ func MakeSimulation() (Simulation){
 
 	sim.Gamma = 1.6
 
-	sim.NSteps = 200
+	sim.NSteps = 10000
 
 	sim.DeltaTHalf = 0.01
 
-	sim.Root = MakeCellsUniform(100000, Vertical)
-
-	for i, _ := range sim.Root.Particles {
-		sim.Root.Particles[i].Vel = Vec2{0.1, 0.01}
-	}
+	sim.Root = MakeCellsUniform(1000, Vertical)
 
 	return sim
 }
@@ -51,7 +46,7 @@ func (sim *Simulation) Run() {
 
 	sim.CalculateForces()
 
-	//canvas := gx.NewCanvas(1024, 1024)
+	canvas := gx.NewCanvas(1920, 1080)
 
 	for step := range sim.NSteps {
 
@@ -82,21 +77,39 @@ func (sim *Simulation) Run() {
 			p.Pos   = p.Pos.Add(&vdt)
 		}
 
-		log.Printf("Calculated step %v/%v", sim.NSteps, step)
+		// Periodic Boundary: particles outside boundary get moved back
+		for i, _ := range sim.Root.Particles {
+			p := &sim.Root.Particles[i]
+			if p.Pos.X >= 1.05 {
+				p.Pos.X -= 1.1
+			}
+			if p.Pos.Y >= 1.05 {
+				p.Pos.Y -= 1.1
+			}
 
-		/*canvas.Clear(gx.BLACK)
+			if p.Pos.X < -0.05 {
+				p.Pos.X += 1.1
+			}
 
-		//PlotBoundingCircles(canvas, sim.Root, 1, gx.GREEN)
-		// Draw all particles in white
-		for _, particle := range sim.Root.Particles {
-			x := int(particle.Pos.X * float64(canvas.W))
-			y := int(particle.Pos.Y * float64(canvas.H))
-			canvas.DrawPoint(x, y, gx.WHITE)
+			if p.Pos.Y < -0.05 {
+				p.Pos.Y += 1.1
+			}
 		}
 
-		canvas.ToPNG(fmt.Sprintf("./out/%v.png", step))
+		log.Printf("Calculated step %v/%v", sim.NSteps, step)
 
-		*/
+		canvas.Clear(gx.BLACK)
+
+		//PlotBoundingCircles(canvas, sim.Root, 1, gx.GREEN)
+		// Draw all particles in SKYBLUE
+		for i, _ := range sim.Root.Particles {
+			particle := &sim.Root.Particles[i]
+			x := float32(particle.Pos.X) * float32(canvas.W)
+			y := float32(particle.Pos.Y) * float32(canvas.H)
+			canvas.DrawDisk(float32(x), float32(y), float32(particle.Rho*2), gx.SKYBLUE_OPAQUE)
+		}
+
+		//canvas.ToPNG(fmt.Sprintf("./out/%.4v.png", step))
 	}
 
 }
