@@ -32,7 +32,7 @@ A png picture is generated from a tree with the MakeTreePng() function. The foll
 
 ![](tree.png)
 
-## 2. Example - Heap
+## 2. Example - Heap Implementation
 
 Showcase BuildHeap, Insert, ExtractMin, Replace functionality. Dumptree function used for visualizing the tree in terminal (text form) and check for correctness.
 
@@ -40,9 +40,112 @@ Showcase BuildHeap, Insert, ExtractMin, Replace functionality. Dumptree function
 go run ./examples/heap/
 ```
 
+Output of this example:
+
+```console
+
+initial array was:    [31 37 82 83 33 54 39 42 62 49 84 59 88 26 27 21 92 97 87 49 33 9 42 49 88 67]
+after heapification:  [9 21 26 31 33 49 27 42 62 37 33 54 67 39 82 83 92 97 87 49 49 84 42 59 88 88]
+
+visualisation to check for correctness:
+
+                          [Root Node]
+                               9                               
+
+                /                              \                
+               21                              26               
+
+        /              \                /              \        
+       31              33              49              27       
+
+    /      \        /      \        /      \        /      \    
+   42      62      37      33      54      67      39      82   
+
+  /  \    /  \    /  \    /  \    /  \    /
+ 83  92  97  87  49  49  84  42  59  88  88 
+
+
+Insert 0 into the Heap:
+
+                          [Root Node]
+                               0                               
+
+                /                              \                
+               21                              9               
+
+        /              \                /              \        
+       31              33              26              27       
+
+    /      \        /      \        /      \        /      \    
+   42      62      37      33      54      49      39      82   
+
+  /  \    /  \    /  \    /  \    /  \    /  \  
+ 83  92  97  87  49  49  84  42  59  88  88  67 
+
+
+ExtractMin from Heap:
+
+
+                          [Root Node]
+                               9                               
+
+                /                              \                
+               21                              26               
+
+        /              \                /              \        
+       31              33              49              27       
+
+    /      \        /      \        /      \        /      \    
+   42      62      37      33      54      67      39      82   
+
+  /  \    /  \    /  \    /  \    /  \    /
+ 83  92  97  87  49  49  84  42  59  88  88 
+
+
+Replace with 33 with root node:
+
+
+                          [Root Node]
+                               21                               
+
+                /                              \                
+               31                              26               
+
+        /              \                /              \        
+       33              33              49              27       
+
+    /      \        /      \        /      \        /      \    
+   42      62      37      33      54      67      39      82   
+
+  /  \    /  \    /  \    /  \    /  \    /
+ 83  92  97  87  49  49  84  42  59  88  88 
+
+```
+
+## 3. Nearest Neigbours
+
+Goal:
+
+>Implement the k nearest neighbor search. Use the priority queue given in the Python template and implement “replace” and “key” functions. Use the particle to cell distance function from the lecture notes or the celldist2() given in the Python template. Are they the same? Optional: Also implement the ball search algorithm given in the lecture notes.
+
+
+The function `FindNearestNeighbours()` acts on one Particle and uses a Prority Queue, implemented similarly to the Heap shown before, to find the lowest distance Neighbours. NN_SIZE=32 constant defines the nearest neighbour count.
+
+```console
+go run ./examples/nearest-neighbours/
+```
+
+It generates two images with 220 particles. The first shows the non periodic version of the particle.FindNearestNeighbour function. The tree cells are also shown in red.
+
+![](nearest_neighbours.png)
+
+The periodic visualization inculeds a the bounding 'spheres' of each tree cell instead of the tree cell.
+
+![](nearest_neighbours_periodic.png)
+
 ## Tests
 
-To run all tests (only Partition function covered for now):
+To run all tests (Partition(), BoundingSpheres() covered for now):
 
 ```console
 go test -v ./...
