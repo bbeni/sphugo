@@ -152,7 +152,7 @@ func Partition (ps []Particle, orientation Orientation, middle float64) (a, b []
  The SPLIT_FRACTION determines the fraction of space in
  the specific direction for left/total or top/total. */
 
-// TODO: @Bug stackoverflow @Leak Memory Maybe memory not initalized
+// TODO(#5): @Bug stackoverflow @Leak Memory Maybe memory not initalized
 // when recomputing Treebuild ?
 // mayne the bug is even in Partition ?
 func (root *Cell) Treebuild (orientation Orientation) {
