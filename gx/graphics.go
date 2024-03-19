@@ -28,6 +28,7 @@ var (
 	RED = color.NRGBA{R: 255, G: 0, B: 0, A: 255}
 	GREEN = color.NRGBA{R: 0, G: 255, B: 0, A: 255}
 	BLUE = color.NRGBA{R: 0, G: 0, B: 255, A: 255}
+	ORANGE = color.NRGBA{R: 255, G: 165, B: 0, A: 255}
 )
 
 type Vec2i struct{

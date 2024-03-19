@@ -8,7 +8,7 @@ func isInsideAny(pos Vec2, cell *Cell) bool {
 
 	x := pos.Sub(&cell.BCenter)
 
-	if x.Dot(&x) <= cell.BRadiusSq {
+	if x.Norm() <= cell.BRadius {
 		return true
 	}
 
@@ -33,7 +33,7 @@ func TestInsideAnySphere60(t *testing.T) {
 	cell.BoundingSpheres()
 
 	for i, p := range cell.Particles {
-		if !isInsideAny(p.Pos, &cell) {
+		if !isInsideAny(p.Pos, cell) {
 			t.Fatalf("Particle %v `%v` is not inside any Cell!", i, p.Pos)
 		}
 	}
@@ -45,7 +45,7 @@ func TestInsideAnySphere1(t *testing.T) {
 	cell.BoundingSpheres()
 
 	for i, p := range cell.Particles {
-		if !isInsideAny(p.Pos, &cell) {
+		if !isInsideAny(p.Pos, cell) {
 			t.Fatalf("Particle %v `%v` is not inside any Cell!", i, p.Pos)
 		}
 	}
@@ -57,7 +57,7 @@ func TestInsideAnySphere6000(t *testing.T) {
 	cell.BoundingSpheres()
 
 	for i, p := range cell.Particles {
-		if !isInsideAny(p.Pos, &cell) {
+		if !isInsideAny(p.Pos, cell) {
 			t.Fatalf("Particle %v `%v` is not inside any Cell!", i, p.Pos)
 		}
 	}

@@ -1,7 +1,10 @@
 /* Linear Algebra functions and types
 */
-
 package tg
+
+import (
+	"math"
+)
 
 // Math functions for int
 func Abs(x int) int {
@@ -42,4 +45,24 @@ func (v *Vec2) Dot(other *Vec2) float64 {
 
 func (v Vec2) Mul(f float64) Vec2 {
 	return Vec2{v.X*f, v.Y*f}
+}
+
+
+func (v *Vec2) Norm() float64 {
+	return math.Sqrt(v.Dot(v))
+}
+
+func (v *Vec2) Normed() Vec2 {
+	return v.Mul(1 / v.Norm())
+}
+
+
+func DistSq(a, b Vec2) float64 {
+	dx, dy := a.X - b.X, a.Y - b.Y
+	return dx*dx + dy*dy
+}
+
+func Dist(a, b Vec2) float64 {
+	dx, dy := a.X - b.X, a.Y - b.Y
+	return math.Hypot(dx, dy)
 }

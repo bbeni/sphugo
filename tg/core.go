@@ -18,10 +18,6 @@ const (
 
 // For 10 Mio particles
 // 10 000 000 * 104 bytes ~~ 1.3 GB
-// 10 000 000 * 512
-// 1 byte = 8 bit
-// 8 byte = 64 bit
-// 16+16+32+8+16+8+16 = 104
 
 type Particle struct {
 	Pos Vec2
@@ -41,10 +37,10 @@ type Particle struct {
 	// @Speed might be bad because we have a big particle size now
 	// should rather keep it seperate to prevent cache misses?
 	// for now we just naively implement it like this
-	// 32*8*2  = 512 bytes
-	NearestNeighbours     [NN_SIZE]*Particle
-	NearestNeighbourDists [NN_SIZE]float64
-	// 616 bytes until now
+	// 32*(8+8)  = 512 bytes
+	NearestNeighbours [NN_SIZE]*Particle
+	NNDists 		  [NN_SIZE]float64
+
 }
 
 // Tree structure every leaf holds
@@ -57,24 +53,14 @@ type Cell struct {
 	UpperRight Vec2
 
 	// Minimum Bounding Sphere
-	BCenter   Vec2
-	BRadiusSq float64
+	BCenter Vec2
+	BRadius float64
 
 	// Children
 	Lower *Cell
 	Upper *Cell
-
-	// Parent
-	Parent *Cell
 }
 
-func (cell *Cell) DistSquared(to *Vec2) float64 {
-	d1 := to.Sub(&cell.UpperRight)
-	d2 := cell.LowerLeft.Sub(to)
-	maxx := math.Max(d1.X, d2.X)
-	maxy := math.Max(d1.Y, d2.Y)
-	return maxx*maxx + maxy*maxy
-}
 
 type Orientation int
 const (
@@ -103,7 +89,7 @@ func InitUniformly(particles []Particle) {
 }
 
 
-func MakeCellsUniform(nParticles int, ori Orientation) (Cell) {
+func MakeCellsUniform(nParticles int, ori Orientation) (*Cell) {
 	particles := make([]Particle, nParticles)
 
 	InitUniformly(particles[:])
@@ -117,7 +103,7 @@ func MakeCellsUniform(nParticles int, ori Orientation) (Cell) {
 	root.Treebuild(ori)
 	root.BoundingSpheres()
 
-	return root
+	return &root
 }
 
 func MakeCell(numberParticles int, initalizer func(index int) Vec2 ) (root *Cell) {
@@ -166,6 +152,9 @@ func Partition (ps []Particle, orientation Orientation, middle float64) (a, b []
  The SPLIT_FRACTION determines the fraction of space in
  the specific direction for left/total or top/total. */
 
+// TODO: @Bug stackoverflow @Leak Memory Maybe memory not initalized
+// when recomputing Treebuild ?
+// mayne the bug is even in Partition ?
 func (root *Cell) Treebuild (orientation Orientation) {
 	
 	var mid float64
@@ -176,7 +165,7 @@ func (root *Cell) Treebuild (orientation Orientation) {
 	}
 	
 	a, b := Partition(root.Particles, orientation, mid)
-	
+
 	if len(a) > 0 {
 		root.Lower = &Cell{
 			Particles: a,
@@ -222,7 +211,7 @@ func (root *Cell) BoundingSpheres() {
 	if root.Upper == nil && root.Lower == nil {
 		if len(root.Particles) == 1 {
 			root.BCenter = root.Particles[0].Pos
-			root.BRadiusSq = 0
+			root.BRadius = 0
 		} else {
 			dSquaredMax := 0.0
 			var pA, pB Vec2
@@ -244,20 +233,23 @@ func (root *Cell) BoundingSpheres() {
 			// the vector that connects outermost points half
 			rMax := pB.Sub(&pA).Mul(0.5)
 			root.BCenter = rMax.Add(&pA)
-			root.BRadiusSq = rMax.Dot(&rMax)
+			BRadiusSq := rMax.Dot(&rMax)
 
 			// step 3: include outliers
 			// naive idea
 			for _, p := range root.Particles {
 				x := root.BCenter.Sub(&p.Pos)
 				rNewSq := x.Dot(&x)
-				if rNewSq > root.BRadiusSq {
-					root.BRadiusSq = rNewSq
+				if rNewSq > BRadiusSq {
+					BRadiusSq = rNewSq
 				}
 			}
 
+			root.BRadius = math.Sqrt(BRadiusSq)
 		}
+		return
 	}
+
 
 	if root.Upper != nil {
 		root.Upper.BoundingSpheres()
@@ -265,6 +257,39 @@ func (root *Cell) BoundingSpheres() {
 
 	if root.Lower != nil {
 		root.Lower.BoundingSpheres()
+	}
+
+	// at max one is not nil!
+	// if unbalanced, just copy the values from the one
+	if root.Upper == nil {
+		root.BRadius = root.Lower.BRadius
+		root.BCenter = root.Lower.BCenter
+		return
+	}
+
+	if root.Lower == nil {
+		root.BRadius = root.Upper.BRadius
+		root.BCenter = root.Upper.BCenter
+		return
+	}
+
+	if root.Lower == nil || root.Upper == nil {
+		panic("unrachable!")
+	}
+
+	// we are sure to have all leafs calculated here
+	// calculating the bounding cricle C that encloses circles A and B
+	if root.Upper != nil && root.Lower != nil {
+		AB := root.Upper.BCenter.Sub(&root.Lower.BCenter)
+		ABNorm := AB.Norm()
+
+		rA := root.Lower.BRadius
+		rB := root.Upper.BRadius
+		rC := (rA + rB + ABNorm) * 0.5
+		mid := AB.Mul((rB - rC) / ABNorm)
+
+		root.BCenter = mid.Add(&root.Upper.BCenter)
+		root.BRadius = rC
 	}
 }
 

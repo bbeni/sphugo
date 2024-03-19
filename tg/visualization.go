@@ -3,7 +3,6 @@ package tg
 
 import (
 	"github.com/bbeni/treego/gx"
-	"math"
 )
 
 func MakeTreePlot(root* Cell, w, h int) (gx.Canvas) {
@@ -30,7 +29,6 @@ func MakeTreePlot(root* Cell, w, h int) (gx.Canvas) {
 	return canvas
 }
 
-
 // draws rectangles for each cell. the higher the level,
 // the color of the rect is more towards violet in rainbow
 func PlotCells(canvas gx.Canvas, root *Cell, color_index, max_color_index int) {
@@ -51,13 +49,15 @@ func PlotCells(canvas gx.Canvas, root *Cell, color_index, max_color_index int) {
 }
 
 // Draw Bounding Circles of leaf nodes in Cell
-func PlotBoundingCircles (c gx.Canvas, root *Cell, color gx.Color) {
+// max_depth should be >= 1
+func PlotBoundingCircles (c gx.Canvas, root *Cell, max_depth int, color gx.Color) {
 
-	if root.Upper == nil && root.Lower == nil {
+	// only plot up to max_depth
+	if root.Depth() <= max_depth {
 
 		x := float32(root.BCenter.X*float64(c.W))
 		y := float32(root.BCenter.Y*float64(c.H))
-		r := float32(math.Sqrt(root.BRadiusSq)) * float32(c.W) // incorrect: use width for now
+		r := float32(root.BRadius)*float32(c.W) // incorrect: use width for now
 
 		if r < 2 {
 			r = 2
@@ -66,10 +66,10 @@ func PlotBoundingCircles (c gx.Canvas, root *Cell, color gx.Color) {
 	}
 
 	if root.Upper != nil {
-		PlotBoundingCircles(c, root.Upper, color)
+		PlotBoundingCircles(c, root.Upper, max_depth, color)
 	}
 
 	if root.Lower != nil {
-		PlotBoundingCircles(c, root.Lower, color)
+		PlotBoundingCircles(c, root.Lower, max_depth, color)
 	}
 }
