@@ -100,7 +100,7 @@ func (p *Particle) NNQueueInsert(dist float64, neighbour *Particle) {
 	NNQueueHeapify(p, 0)
 }
 
-// TODO: @Speed use memcopy
+// TODO(#6): @Speed use memcopy
 func (p *Particle) NNQueueInitSentinel() {
 	for i := range NN_SIZE {
 		p.NNDists[i] = math.MaxFloat64
