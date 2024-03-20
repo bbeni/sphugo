@@ -12,6 +12,11 @@ import (
 func (particle *Particle) FindNearestNeighbours(root *Cell) {
 	particle.NNQueueInitSentinel()
 	particle.findNNRec(root, Vec2{0, 0})
+
+	// make dists use Sqrt
+	for i := range NN_SIZE {
+		particle.NNDists[i] = math.Sqrt(particle.NNDists[i])
+	}
 }
 
 // Periodic version
@@ -22,6 +27,10 @@ func (particle *Particle) FindNearestNeighboursPeriodic(root *Cell) {
 		for j:=-1.0; j<=1; j++ {
 			particle.findNNRec(root, Vec2{i, j})
 		}
+	}
+	// make dists use Sqrt
+	for i := range NN_SIZE {
+		particle.NNDists[i] = math.Sqrt(particle.NNDists[i])
 	}
 }
 

@@ -16,23 +16,19 @@ const (
 	NN_SIZE 				= 32    // Nearest Neighbour Size
 )
 
-// For 10 Mio particles
-// 10 000 000 * 104 bytes ~~ 1.3 GB
-
 type Particle struct {
 	Pos Vec2
 	Vel Vec2
 	Rho float64   // Density
 	C float64     // Speed of sound
 	E float64     // Specific internal energy
-	H float64     // NN parameter
 
 	// Temporary values filled by Simulation
 	EDot float64  // dE/dt
 	VDot Vec2     // Acceleration
 	EPred float64 // Predicted internal energy
 	VPred Vec2    // Predicted Velicty
-	// 104 bytes until now
+	// 96 bytes until now
 
 	// @Speed might be bad because we have a big particle size now
 	// should rather keep it seperate to prevent cache misses?
@@ -75,6 +71,7 @@ func (orientation Orientation) other() (Orientation) {
 	return Vertical
 }
 
+
 func InitUniformly(particles []Particle) {
 
 	if USE_RANDOM_SEED {
@@ -83,22 +80,19 @@ func InitUniformly(particles []Particle) {
 	    rand.Seed(12345678)
 	}
 
+	// Uniformely in [0, 1] x [0, 1]
 	for i, _ := range particles {
 		particles[i].Pos = Vec2{rand.Float64(), rand.Float64()}
 		particles[i].Pos = Vec2{rand.Float64(), rand.Float64()}
 	}
 	for i, _ := range particles {
-		particles[i].Rho = rand.Float64()*4 + 1.0
+		particles[i].Rho = 1
 		particles[i].Z   = rand.Int()
-		zNormalized := float64(particles[i].Z)/float64(math.MaxInt)
-		particles[i].Vel = Vec2{rand.Float64()*0.02, -rand.Float64()*0.15}.Mul(1/zNormalized)
 	}
 }
 
-func MakeCellsUniform(nParticles int, ori Orientation) (*Cell) {
-	particles := make([]Particle, nParticles)
 
-	InitUniformly(particles[:])
+func MakeCells(particles []Particle, ori Orientation) (*Cell) {
 
 	root := Cell{
 		LowerLeft: Vec2{0, 0},
@@ -110,6 +104,15 @@ func MakeCellsUniform(nParticles int, ori Orientation) (*Cell) {
 	root.BoundingSpheres()
 
 	return &root
+}
+
+
+func MakeCellsUniform(n int, orientation Orientation) (*Cell) {
+
+	particles := make([]Particle, n)
+	cell := MakeCells(particles, orientation)
+
+	return cell
 }
 
 func MakeCell(numberParticles int, initalizer func(index int) Vec2 ) (root *Cell) {
