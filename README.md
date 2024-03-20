@@ -1,8 +1,10 @@
-# SPH Simulations (ESC 202 Course UZH)
+# SPHUGO
 
-SPHUGO - SPH Using GO - Source code available at (www.github.com/bbeni/sphugo)
+**S**mooth **P**article **H**ydrodynamics **U**sing **GO**
 
-My attempt at the assignments at ESC 202 course at UZH written in [GO](https://go.dev/ "Go Language"). 🦆 The Goal is to have a working Smooth Particle Hydrodynamics (SPH) code. GO as a language was chosen to easily parallelize the simulation and have fast execution times comparable to C/C++. There are 5 tasks leading up to the simulation. The following sections should provide documentation of the implementation process.
+Source code available at (www.github.com/bbeni/sphugo)
+
+This is my attempt at the assignments of ESC 202 course at UZH written in [GO](https://go.dev/ "Go Language"). 🦆 The Goal is to have a working Smooth Particle Hydrodynamics (SPH) code. GO as a language was chosen to easily parallelize the simulation and have fast execution times comparable to C/C++. There are 5 tasks leading up to the simulation. The following sections should provide documentation of the implementation process.
 
 ## 1. Task - Binary Partition 2d Particles
 
@@ -35,7 +37,7 @@ A png picture is generated from a tree with the MakeTreePng() function. The foll
 ![](tree.png)
 
 
-## 2. Task - Nearest Neigbours
+## 2. Task - Nearest Neighbours
 
 Goal:
 
@@ -146,6 +148,13 @@ It generates two images with 220 particles. One random particle is chosen and th
 The periodic visualization includes the bounding 'sphere' of each tree cell leaf instead of the tree cells:
 
 ![](nearest_neighbours_periodic.png)
+
+## 3. Task - Density Calculation
+
+Goal:
+
+>For each particle calculate the “top-hat” density from the 32 nearest neighbors and plot it using a colormap. We will need the density to implement SPH so it needs to be well tested. Also, make sure it can work with periodic boundary conditions! Design the program such that you can easily switch the kernel function (we will look at Monaghan and Wendtland kernels).
+>Now, calculate the density using the Monaghan kernel defined in the lecture. Plot and compare to the density you get from the “top-hat” kernel (the Monaghan result should be a little smoother).
 
 ## Tests
 
