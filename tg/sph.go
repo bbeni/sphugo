@@ -3,7 +3,7 @@ package tg
 import (
 	"math"
 	"log"
-	"fmt"
+ 	"fmt"
 	"github.com/bbeni/sphugo/gx"
 )
 
@@ -28,15 +28,25 @@ func MakeSimulation() (Simulation){
 
 	sim.DeltaTHalf = 0.01
 
-	sim.Root = MakeCellsUniform(1000, Vertical)
+	sim.Root = MakeCellsUniform(10_000, Vertical)
 
 	return sim
 }
+
+
+
 
 // SPH
 func (sim *Simulation) Run() {
 
 	// TODO(#2): check if simulation initialized
+
+
+	// used to order particles acoording to z-value before rendering
+	renderingParticleArray := make([]*Particle, len(sim.Root.Particles))
+	for i, _ := range sim.Root.Particles {
+		renderingParticleArray[i] = &sim.Root.Particles[i]
+	}
 
 	// initialization drift dt=0
 	for _, p := range sim.Root.Particles {
@@ -100,13 +110,24 @@ func (sim *Simulation) Run() {
 
 		canvas.Clear(gx.BLACK)
 
-		//PlotBoundingCircles(canvas, sim.Root, 1, gx.GREEN)
-		// Draw all particles in SKYBLUE
-		for i, _ := range sim.Root.Particles {
-			particle := &sim.Root.Particles[i]
+
+		extractZindex := func(p *Particle) int {
+			return -p.Z
+		}
+
+		QuickSort(renderingParticleArray, extractZindex)
+
+		for _, particle := range renderingParticleArray{
 			x := float32(particle.Pos.X) * float32(canvas.W)
 			y := float32(particle.Pos.Y) * float32(canvas.H)
-			canvas.DrawDisk(float32(x), float32(y), float32(particle.Rho*2), gx.SKYBLUE_OPAQUE)
+
+			zNormalized := float32(particle.Z)/float32(math.MaxInt)
+
+			//color_index := 255 - uint8((particle.Rho - 1)*64)
+			color_index := 255 - uint8(zNormalized * 256)
+			color := gx.ToxicRamp(color_index)
+
+			canvas.DrawDisk(float32(x), float32(y), zNormalized*zNormalized*20+1, color)
 		}
 
 		canvas.ToPNG(fmt.Sprintf("./out/%.4v.png", step))

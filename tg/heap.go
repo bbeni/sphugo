@@ -209,3 +209,47 @@ func DumpHeap[T cmp.Ordered](array []T) {
 		fmt.Print("\n")
 	}
 }
+
+
+func QuickSort(particles []*Particle, cmpValue func(*Particle) int) {
+	if len(particles) > 0 {
+		left, right := partitionQS(particles, cmpValue)
+		QuickSort(left, cmpValue)
+		QuickSort(right, cmpValue)
+	}
+}
+
+func partitionQS(ps []*Particle, cmpValue func(*Particle) int) ([]*Particle, []*Particle) {
+
+	i := 0
+	j := len(ps) - 2
+
+	if len(ps) == 0 {
+		panic("QS unreachable")
+	}
+
+	pivot := cmpValue(ps[len(ps) - 1])
+
+	for i < j {
+		for i < j && cmpValue(ps[i]) <= pivot {
+			i++
+		}
+		for i < j && cmpValue(ps[j]) > pivot {
+			j--
+		}
+
+		if cmpValue(ps[i]) > cmpValue(ps[j]) {
+			ps[i], ps[j] = ps[j], ps[i]
+		}
+	}
+
+	if cmpValue(ps[i]) > pivot {
+		ps[i], ps[len(ps)-1] = ps[len(ps)-1], ps[i]
+	} else {
+		i = len(ps)-1
+	}
+
+	return ps[:i], ps[i+1:]
+}
+
+

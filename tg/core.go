@@ -41,6 +41,8 @@ type Particle struct {
 	NearestNeighbours [NN_SIZE]*Particle
 	NNDists 		  [NN_SIZE]float64
 
+	// visualisation trick for depth rendering
+	Z int
 }
 
 // Tree structure every leaf holds
@@ -86,12 +88,12 @@ func InitUniformly(particles []Particle) {
 		particles[i].Pos = Vec2{rand.Float64(), rand.Float64()}
 	}
 	for i, _ := range particles {
-		particles[i].Rho = rand.Float64()*6 + 1.0
-		particles[i].Vel = Vec2{rand.Float64()*0.05, rand.Float64()*0.05}
+		particles[i].Rho = rand.Float64()*4 + 1.0
+		particles[i].Z   = rand.Int()
+		zNormalized := float64(particles[i].Z)/float64(math.MaxInt)
+		particles[i].Vel = Vec2{rand.Float64()*0.02, -rand.Float64()*0.15}.Mul(1/zNormalized)
 	}
-
 }
-
 
 func MakeCellsUniform(nParticles int, ori Orientation) (*Cell) {
 	particles := make([]Particle, nParticles)
@@ -117,7 +119,7 @@ func MakeCell(numberParticles int, initalizer func(index int) Vec2 ) (root *Cell
 
 /* The function Partition() partitions an array of type Particle based
  on their 2d position. They are compared to a pivot value called middle
- in a "bubble sort like" manner in a specified axis that can either be
+ in a "quick sort like" manner in a specified axis that can either be
  "Vertical" or "Horizontal". The tests should cover most edge cases.
  Returns two partitioned slices a, b (just indices of array in Go).*/
 
