@@ -144,6 +144,87 @@ func RainbowRamp(index uint8) (Color) {
 	}
 }
 
+
+// index 0 to 255 gives a
+// whatever map cheap remake of
+// https://www.kennethmoreland.com/color-advice/
+// ordered on wish
+func ParaRamp(index uint8) (Color) {
+	x := float64(index)
+	r := math.Min(215, math.Max(0, -math.Abs((x - 60)*31/17 - 232) + 245))
+	g := math.Min(190, math.Max(0, -math.Abs(x*31/17 - 232) + 245))
+	b := math.Min(215, math.Max(0, -math.Abs((x + 70)*31/17 - 232) + 245))
+	return color.NRGBA{
+		R: uint8(r), G: uint8(g), B: uint8(b), A: 255,
+	}
+}
+
+// https://www.kennethmoreland.com/color-advice/
+var blackbodyRGB = [17*3]uint8{
+	0,		0,		0,
+	36,		15,		9,
+	62,		22,		17,
+	90,		27,		22,
+	119,	30,		26,
+	150,	33,		30,
+	180,	38,		34,
+	197,	65,		28,
+	214,	88,		19,
+	228,	112,	7,
+	231,	141,	18,
+	233,	169,	29,
+	233,	195,	39,
+	231,	222,	50,
+	246,	240,	144,
+	255,	255,	255,
+	255,	255,	255,
+}
+func HeatRamp(index uint8) (Color) {
+
+	t := float32(index % 16)/16
+	i := int(index)/16
+
+	r := float32(blackbodyRGB[i*3+3])*t + float32(blackbodyRGB[i*3  ])*(1 - t)
+	g := float32(blackbodyRGB[i*3+4])*t + float32(blackbodyRGB[i*3+1])*(1 - t)
+	b := float32(blackbodyRGB[i*3+5])*t + float32(blackbodyRGB[i*3+2])*(1 - t)
+
+	return color.NRGBA{R:uint8(r), G:uint8(g), B:uint8(b), A:255}
+}
+
+// Kindlmann
+// https://www.kennethmoreland.com/color-advice/
+var kindlmannRGB = [17*3]uint8{
+	0,		0,		0,
+	37,		3,		57,
+	37,		5,		109,
+	24,		8,		163,
+	8,		51,		160,
+	6,		83,		127,
+	5,		105,	105,
+	6,		127,	83,
+	7,		148,	47,
+	15,		168,	8,
+	63,		186,	9,
+	133,	199,	10,
+	205,	205,	10,
+	251,	210,	163,
+	253,	232,	223,
+	255,	255,	255,
+	255,	255,	255,
+}
+
+func ToxicRamp(index uint8) (Color) {
+
+	t := float32(index % 16)/16
+	i := int(index)/16
+
+	r := float32(kindlmannRGB[i*3+3])*t + float32(kindlmannRGB[i*3  ])*(1 - t)
+	g := float32(kindlmannRGB[i*3+4])*t + float32(kindlmannRGB[i*3+1])*(1 - t)
+	b := float32(kindlmannRGB[i*3+5])*t + float32(kindlmannRGB[i*3+2])*(1 - t)
+
+	return color.NRGBA{R:uint8(r), G:uint8(g), B:uint8(b), A:255}
+}
+
 func (c Canvas) DrawLine(start, end Vec2i, color Color) {
 	draw_line(c.Img, start, end, color)
 }
