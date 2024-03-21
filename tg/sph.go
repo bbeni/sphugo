@@ -6,7 +6,9 @@ import (
 	"time"
  	"math/rand"
 	"github.com/bbeni/sphugo/gx"
-	"fmt"
+  //"fmt"
+	"image"
+	"sync"
 )
 
 type Simulation struct {
@@ -17,6 +19,10 @@ type Simulation struct {
 
 	// Constants
 	Gamma float64 // heat capacity ratio = 1+2/f
+
+	//frames for rendering
+	Frames   []image.Image
+	FramesMu sync.Mutex
 }
 
 
@@ -25,15 +31,18 @@ func MakeSimulation() (Simulation){
 
 	var sim Simulation
 
-	sim.Gamma = 1.6
-	sim.NSteps = 2000
-	sim.DeltaTHalf = 0.01
-	sim.NParticles = 2_500
+	sim.Gamma = 1.8
+	sim.NSteps = 1000
+	sim.DeltaTHalf = 0.002
+	sim.NParticles = 500
 
 	particles := make([]Particle, sim.NParticles)
 	//InitSpecial(particles)
-	InitEvenlyVelGradient(particles)
+	InitEvenly(particles)
 	sim.Root = MakeCells(particles, Vertical)
+
+
+	sim.Frames = make([]image.Image, 0, sim.NSteps)
 
 	return sim
 }
@@ -75,6 +84,24 @@ func InitEvenlyVelGradient(particles []Particle) {
 }
 
 
+func InitEvenly(particles []Particle) {
+	if USE_RANDOM_SEED {
+		rand.Seed(time.Now().UnixNano())
+	} else {
+	    rand.Seed(12345678)
+	}
+
+	for i, _ := range particles {
+		particles[i].Pos = Vec2{rand.Float64(), rand.Float64()}
+	}
+	for i, _ := range particles {
+		particles[i].Z = rand.Int()
+		particles[i].E = 0.001
+	}
+}
+
+
+
 // SPH
 func (sim *Simulation) Run() {
 
@@ -97,7 +124,7 @@ func (sim *Simulation) Run() {
 
 	sim.CalculateForces()
 
-	canvas := gx.NewCanvas(1920, 1080)
+	canvas := gx.NewCanvas(1280, 720)
 
 	for step := range sim.NSteps {
 
@@ -154,8 +181,8 @@ func (sim *Simulation) Run() {
 
 			extractZindex := func(p *Particle) int {
 
-				return int(p.Rho*100000)
-				//return -p.Z
+				//return int(p.Rho*100000)
+				return -p.Z
 			}
 
 			QuickSort(renderingParticleArray, extractZindex)
@@ -169,24 +196,29 @@ func (sim *Simulation) Run() {
 				//color_index := 255 - uint8(zNormalized * 256)
 
 				color_index := uint8(math.Min(float64(particle.Rho/float64(sim.NParticles*3)*256), 255))
-				//color := gx.ParaRamp(color_index)
+				color := gx.ParaRamp(color_index)
 				//color := gx.HeatRamp(color_index)
-				color := gx.ToxicRamp(color_index)
+				//color := gx.ToxicRamp(color_index)
 				//color := gx.RainbowRamp(color_index)
 
 
-				if color_index > 254 {
+				if color_index > 255 {
 					nnRadius := float32(particle.NNDists[0])*float32(canvas.W)
 					canvas.DrawCircle(x, y, nnRadius, 2, gx.WHITE)
 				}
 
 				//canvas.DrawDisk(float32(x), float32(y), zNormalized*zNormalized*20+1, color)
-
-				rhoNormalized := particle.Rho / float64(sim.NParticles)
-				canvas.DrawDisk(float32(x), float32(y), float32(26/rhoNormalized), color)
+				canvas.DrawDisk(float32(x), float32(y), 14, color)
 			}
 
-			canvas.ToPNG(fmt.Sprintf("./out/%.4v.png", step))
+			//canvas.ToPNG(fmt.Sprintf("./out/%.4v.png", step))
+
+			img := canvas.Img
+
+			//sim.FramesMu.Lock()
+			sim.Frames = append(sim.Frames, img)
+			//sim.FramesMu.Unlock()
+			canvas = gx.NewCanvas(1280, 720)
 		}
 
 	}
@@ -259,6 +291,67 @@ func DensityMonahan2D(p *Particle) (float64) {
 	return acc*6*40/(math.Pi*maxR*maxR*7)
 }
 
+// lets assume mass 1 per particle, so the density is just the 1/volume of sphere
+// viscosity PIab not implemented
+// - Sum [ (Pa/rhoa^2       + Pb/rhob^2     + PIab )]
+//			contribution A  + contributionB
+func AccelerationAndEDotMonahan2D(p *Particle, gammaFactor float64) {
+	maxR := p.NNDists[0]
+
+	contributionA := p.C*p.C / (gammaFactor*p.Rho)
+	contributionB := 0.0
+
+	nablaAKernel := 0.0
+
+	acc_ax := 0.0
+	acc_ay := 0.0
+	acc_edot := 0.0
+
+	var x float64
+	var i int
+	for i = range NN_SIZE {
+		nn := p.NearestNeighbours[i]
+		x = p.NNDists[i]/maxR 			// r/h in lecture
+
+		if x > 1 || x < 0 {
+			panic("unreachable")
+		}
+
+		if x < 0.5 {
+			nablaAKernel = (3*x*x - 2*x) / p.NNDists[i]
+		} else {
+		 	nablaAKernel = -(1 - x)*(1 - x) / p.NNDists[i]
+		}
+
+		// clamp kernel
+		clamp := 0.9
+		nablaAKernel = math.Max(math.Min(nablaAKernel, clamp), -clamp)
+
+		contributionB = nn.C*nn.C / (gammaFactor*nn.Rho)
+
+		rX := (p.Pos.X - nn.Pos.X)
+		rY := (p.Pos.Y - nn.Pos.Y)
+		acc_ax += rX * (contributionA + contributionB) * nablaAKernel
+		acc_ay += rY * (contributionA + contributionB) * nablaAKernel
+		acc_edot += (rY * (p.VPred.X - nn.VPred.X) + rY * (p.VPred.Y - nn.VPred.Y)) * nablaAKernel
+
+	}
+
+	// clamp acceleration
+	clamp := 0.9
+	acc_ax = math.Max(math.Min(acc_ax, clamp), -clamp)
+	acc_ay = math.Max(math.Min(acc_ay, clamp), -clamp)
+
+	// clamp energy change
+	acc_edot = math.Max(math.Min(acc_edot, 10), 0)
+
+	acc := Vec2{acc_ax, acc_ay}
+    acc = acc.Mul(-6*40/(math.Pi*maxR*maxR*maxR*7))
+	p.VDot = acc
+	p.EDot = acc_edot
+	//fmt.Println(p.EDot, p.VDot, p.VPred, p.C)
+}
+
 
 
 func (sim *Simulation) CalculateForces() {
@@ -299,6 +392,9 @@ func (sim *Simulation) CalculateForces() {
 	// VDot, EDot
 	{
 		// TODO(#4): implement NN forces
+		for i, _ := range sim.Root.Particles {
+			AccelerationAndEDotMonahan2D(&sim.Root.Particles[i], sim.Gamma)
+		}
 	}
 
 }

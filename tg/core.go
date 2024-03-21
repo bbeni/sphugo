@@ -24,7 +24,7 @@ type Particle struct {
 	E float64     // Specific internal energy
 
 	// Temporary values filled by Simulation
-	EDot float64  // dE/dt
+	EDot float64  // specific internal energy change de/dt
 	VDot Vec2     // Acceleration
 	EPred float64 // Predicted internal energy
 	VPred Vec2    // Predicted Velicty
