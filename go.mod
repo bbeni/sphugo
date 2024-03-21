@@ -1,4 +1,4 @@
-module github.com/bbeni/sphego
+module github.com/bbeni/sphugo
 
 go 1.22.1
 
