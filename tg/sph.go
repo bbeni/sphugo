@@ -23,6 +23,8 @@ type Simulation struct {
 	//frames for rendering
 	Frames   []image.Image
 	FramesMu sync.Mutex
+
+	renderingParticleArray []*Particle
 }
 
 
@@ -101,19 +103,26 @@ func InitEvenly(particles []Particle) {
 }
 
 
-
-// SPH
 func (sim *Simulation) Run() {
 
+	sim.Init()
+
+	for step := range sim.NSteps {
+		sim.Step(step)
+	}
+
+}
+
+func (sim *Simulation) Init() {
 	// TODO(#2): check if simulation initialized
 	if sim.Root == nil || len(sim.Root.Particles) == 0  {
 		panic("int Run(): Simulation not initialized!")
 	}
 
 	// used to order particles acoording to z-value before rendering
-	renderingParticleArray := make([]*Particle, len(sim.Root.Particles))
+	sim.renderingParticleArray = make([]*Particle, len(sim.Root.Particles))
 	for i, _ := range sim.Root.Particles {
-		renderingParticleArray[i] = &sim.Root.Particles[i]
+		sim.renderingParticleArray[i] = &sim.Root.Particles[i]
 	}
 
 	// initialization drift dt=0
@@ -123,11 +132,12 @@ func (sim *Simulation) Run() {
 	}
 
 	sim.CalculateForces()
+}
 
-	canvas := gx.NewCanvas(1280, 720)
+// SPH
+func (sim *Simulation) Step(step int) {
 
-	for step := range sim.NSteps {
-
+	{
 		// drift 1 for leapfrog dt/2
 		for i, _ := range sim.Root.Particles {
 			p := &sim.Root.Particles[i]
@@ -176,7 +186,11 @@ func (sim *Simulation) Run() {
 
 		log.Printf("Calculated step %v/%v", step, sim.NSteps)
 
+
+		// Rendering the frame in this block
 		{
+			canvas := gx.NewCanvas(1280, 720)
+
 			canvas.Clear(gx.BLACK)
 
 			extractZindex := func(p *Particle) int {
@@ -185,9 +199,9 @@ func (sim *Simulation) Run() {
 				return -p.Z
 			}
 
-			QuickSort(renderingParticleArray, extractZindex)
+			QuickSort(sim.renderingParticleArray, extractZindex)
 
-			for _, particle := range renderingParticleArray{
+			for _, particle := range sim.renderingParticleArray{
 				x := float32(particle.Pos.X) * float32(canvas.W)
 				y := float32(particle.Pos.Y) * float32(canvas.H)
 
@@ -218,7 +232,6 @@ func (sim *Simulation) Run() {
 			//sim.FramesMu.Lock()
 			sim.Frames = append(sim.Frames, img)
 			//sim.FramesMu.Unlock()
-			canvas = gx.NewCanvas(1280, 720)
 		}
 
 	}

@@ -23,25 +23,33 @@ import (
 
 
 const (
-	PANEL_W    = 300
+	PANEL_W    = 330
 	RENDERER_W = 1280
 	RENDERER_H = 720
-	TEXT_SIZE  = 56
+	TEXT_SIZE  = 32
+	SEEKER_H   = 40
+	SEEKER_W   = 20
 )
 
 type Theme struct {
 	Background	   color.RGBA
+
 	ButtonText	   color.RGBA
 	ButtonUp	   color.RGBA
 	ButtonHover	   color.RGBA
 	ButtonBlink    color.RGBA
+
+	SeekerBackground color.RGBA
+	SeekerFrame		 color.RGBA
+	SeekerCursor	 color.RGBA
+
 	FontFace	   font.Face
 }
 
 func run() {
 
 	W 			:= RENDERER_W + PANEL_W
-	H 	  		:= RENDERER_H
+	H 	  		:= RENDERER_H + SEEKER_H
 	BTN_H 		:= 100
 	MARGIN_BOT	:= 4
 
@@ -61,10 +69,16 @@ func run() {
 
 	colorTheme := &Theme{
 		Background:  color.RGBA{18,   18,  18, 255},
+
 		ButtonText:  color.RGBA{255, 250, 240, 255}, // Floral White
 		ButtonUp:    color.RGBA{36,   33,  36, 255}, // Raisin Black
 		ButtonHover: color.RGBA{45,   45,  45, 255},
 		ButtonBlink: color.RGBA{100, 100, 100, 255},
+
+		SeekerBackground:		color.RGBA{100,  0,  0, 255},
+		SeekerFrame:	 		color.RGBA{150,  0,  0, 255},
+		SeekerCursor:	 		color.RGBA{180, 30, 40, 255},
+
 		FontFace:    fontFace,
 	}
 
@@ -88,19 +102,16 @@ func run() {
 	{
 		xa := W - PANEL_W
 		xb := W
-		go Button(mux.MakeEnv(), "Simulate", colorTheme, image.Rect(xa, 0, xb, BTN_H), &fontMu, func() {
-			cmd <- "start"
+		go Button(mux.MakeEnv(), "Run Simulation", colorTheme, image.Rect(xa, 0, xb, BTN_H), &fontMu, func() {
+			cmd <- "."
 		})
-		go Button(mux.MakeEnv(), "Play", colorTheme, image.Rect(xa, 1*(BTN_H+MARGIN_BOT), xb, 1*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu, func() {
-			play <- "play"
+		go Button(mux.MakeEnv(), "Pause Simulation", colorTheme, image.Rect(xa, 1*(BTN_H+MARGIN_BOT), xb, 1*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu, func() {
+			cmd <- "."
 		})
-		go Button(mux.MakeEnv(), "Pause", colorTheme, image.Rect(xa, 2*(BTN_H+MARGIN_BOT), xb, 2*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu, func() {
-			play <- "pause"
+		go Button(mux.MakeEnv(), "Play/Pause", colorTheme, image.Rect(xa, 2*(BTN_H+MARGIN_BOT), xb, 2*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu, func() {
+			play <- "."
 		})
-		go Button(mux.MakeEnv(), "Resume", colorTheme, image.Rect(xa, 3*(BTN_H+MARGIN_BOT), xb, 3*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu, func() {
-
-		})
-		go Button(mux.MakeEnv(), "Render", colorTheme, image.Rect(xa, 4*(BTN_H+MARGIN_BOT), xb, 4*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu, func() {
+		go Button(mux.MakeEnv(), "Render", colorTheme, image.Rect(xa, 3*(BTN_H+MARGIN_BOT), xb, 3*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu, func() {
 
 		})
 
@@ -109,9 +120,12 @@ func run() {
 
 	simulation := tg.MakeSimulation()
 
-	go Simulator(mux.MakeEnv(), cmd, &simulation)
-	go Renderer(mux.MakeEnv(), image.Rect(0, 0, RENDERER_W, RENDERER_H), play, &simulation)
+	{
+		go Simulator(mux.MakeEnv(), cmd, &simulation)
+		go Renderer(mux.MakeEnv(), image.Rect(0, 0, RENDERER_W, RENDERER_H), play, &simulation)
+		go Seeker(mux.MakeEnv(), image.Rect(0, RENDERER_H, RENDERER_W, RENDERER_H+SEEKER_H), colorTheme)
 
+	}
 
 	// we use the master env now, w is used by the mux
 	for event := range env.Events() {
@@ -126,10 +140,20 @@ func run() {
 
 func Simulator(env gui.Env, cmd <-chan string, simulation *tg.Simulation) {
 
+	simulation.Init()
+
+	running := false
+	step := 0
+
 	for {
 		select {
 		case <-cmd:
-			simulation.Run()
+			running = !running
+		default:
+			if running {
+				simulation.Step(step)
+				step += 1
+			}
 		}
 	}
 }
@@ -185,7 +209,11 @@ func Button(env gui.Env, text string, colorTheme *Theme,
 
 			if visible {
 				draw.Draw(drw, r, buttonBg, image.ZP, draw.Src)
-				draw.Draw(drw, r, textImage, textImage.Bounds().Min, draw.Src)
+				textRect := r
+				textRect.Min.Y += textRect.Dy()/2 - textImage.Bounds().Dy()/2
+				textRect.Min.X += textRect.Dx()/2 - textImage.Bounds().Dx()/2
+
+				draw.Draw(drw, textRect, textImage, textImage.Bounds().Min, draw.Src)
 			} else {
 				draw.Draw(drw, r, image.NewUniform(colorTheme.ButtonBlink), image.ZP, draw.Src)
 			}
@@ -220,6 +248,29 @@ func Button(env gui.Env, text string, colorTheme *Theme,
 	close(env.Draw())
 }
 
+func Seeker(env gui.Env, r image.Rectangle, colorTheme *Theme) {
+
+	env.Draw() <- func(drw draw.Image) image.Rectangle {
+		imgUni := image.NewUniform(colorTheme.SeekerBackground)
+		draw.Draw(drw, r, imgUni, image.ZP, draw.Src)
+
+		imgUni = image.NewUniform(colorTheme.SeekerCursor)
+
+		cursorRect := r
+		cursorRect.Max.X = SEEKER_W
+		draw.Draw(drw, cursorRect, imgUni, image.ZP, draw.Src)
+
+		return r
+	}
+
+	for event := range env.Events() {
+		switch event := event.(type) {
+		default:
+			fmt.Println(event)
+		}
+	}
+}
+
 
 func Renderer(env gui.Env, r image.Rectangle, play <-chan string, simulation *tg.Simulation) {
 
@@ -236,15 +287,21 @@ func Renderer(env gui.Env, r image.Rectangle, play <-chan string, simulation *tg
 		}
 	}
 
+	running := false
+	step := 0
+
 	for {
 		select{
 		case <-play:
-			if simulation != nil {
-				fmt.Println(len(simulation.Frames))
-				for i := 0; i < len(simulation.Frames); i++ {
-					env.Draw() <- drawFrame(i)
-					time.Sleep(time.Second / 30)
+			running = !running
+		default:
+			if running && simulation != nil {
+				if step >= len(simulation.Frames) {
+					step = 0
 				}
+				env.Draw() <- drawFrame(step)
+				step += 1
+				time.Sleep(time.Second / 60)
 			}
 		}
 	}
