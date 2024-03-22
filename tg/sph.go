@@ -33,10 +33,10 @@ func MakeSimulation() (Simulation){
 
 	var sim Simulation
 
-	sim.Gamma = 1.8
-	sim.NSteps = 1000
-	sim.DeltaTHalf = 0.002
-	sim.NParticles = 500
+	sim.Gamma = 1.3
+	sim.NSteps = 10000
+	sim.DeltaTHalf = 0.004
+	sim.NParticles = 10_000
 
 	particles := make([]Particle, sim.NParticles)
 	//InitSpecial(particles)
@@ -140,7 +140,7 @@ func (sim *Simulation) Step(step int) {
 	{
 		// drift 1 for leapfrog dt/2
 		for i, _ := range sim.Root.Particles {
-			p := &sim.Root.Particles[i]
+			p      := &sim.Root.Particles[i]
 			vdt    := p.Vel.Mul(sim.DeltaTHalf)
 			p.Pos   = p.Pos.Add(&vdt)
 			adt    := p.VDot.Mul(sim.DeltaTHalf)
@@ -165,24 +165,43 @@ func (sim *Simulation) Step(step int) {
 			p.Pos   = p.Pos.Add(&vdt)
 		}
 
-		// Periodic Boundary: particles outside boundary get moved back
+		/*// Periodic Boundary: particles outside boundary get moved back
+		for i, _ := range sim.Root.Particles {
+			p := &sim.Root.Particles[i]
+			if p.Pos.X >= 1.5 {
+				p.Pos.X -= 2
+			}
+			if p.Pos.Y >= 1.5 {
+				p.Pos.Y -= 2
+			}
+
+			if p.Pos.X < -0.5 {
+				p.Pos.X += 2
+			}
+
+			if p.Pos.Y < -0.5 {
+				p.Pos.Y += 2
+			}
+		}*/
+
 		for i, _ := range sim.Root.Particles {
 			p := &sim.Root.Particles[i]
 			if p.Pos.X >= 1 {
-				p.Pos.X -= 1
+				p.Vel.X = -p.Vel.X
 			}
 			if p.Pos.Y >= 1 {
-				p.Pos.Y -= 1
-			}
+				p.Vel.Y = -p.Vel.Y
 
+			}
 			if p.Pos.X < 0 {
-				p.Pos.X += 1
+				p.Vel.X = -p.Vel.X
 			}
 
 			if p.Pos.Y < 0 {
-				p.Pos.Y += 1
+				p.Vel.Y = -p.Vel.Y
 			}
 		}
+
 
 		log.Printf("Calculated step %v/%v", step, sim.NSteps)
 
@@ -210,9 +229,9 @@ func (sim *Simulation) Step(step int) {
 				//color_index := 255 - uint8(zNormalized * 256)
 
 				color_index := uint8(math.Min(float64(particle.Rho/float64(sim.NParticles*3)*256), 255))
-				color := gx.ParaRamp(color_index)
+				//color := gx.ParaRamp(color_index)
 				//color := gx.HeatRamp(color_index)
-				//color := gx.ToxicRamp(color_index)
+				color := gx.ToxicRamp(color_index)
 				//color := gx.RainbowRamp(color_index)
 
 
@@ -222,7 +241,7 @@ func (sim *Simulation) Step(step int) {
 				}
 
 				//canvas.DrawDisk(float32(x), float32(y), zNormalized*zNormalized*20+1, color)
-				canvas.DrawDisk(float32(x), float32(y), 14, color)
+				canvas.DrawDisk(float32(x), float32(y), 8, color)
 			}
 
 			//canvas.ToPNG(fmt.Sprintf("./out/%.4v.png", step))
