@@ -22,7 +22,6 @@ import (
 )
 
 // TODO: remove later
-
 var _ = fmt.Println
 
 const (
@@ -34,11 +33,12 @@ const (
 	BTN_H 	   = 70
 	MARGIN_BOT = 4
 
-	SEEKER_H   = 30
-	SEEKER_W   = 10
-	SEEKER_FRAME_MARGIN = 2
+	SEEKER_H   = 24
+	SEEKER_W   = 16
+	SEEKER_MIN_W = 8
+	SEEKER_FRAME_MARGIN = 4
 
-	BOT_PANEL_H = 200
+	BOT_PANEL_H = 240
 )
 
 type Theme struct {
@@ -59,7 +59,7 @@ type Theme struct {
 func run() {
 
 	W 			:= RENDERER_W + PANEL_W
-	H 	  		:= RENDERER_H + SEEKER_H
+	H 	  		:= RENDERER_H + SEEKER_H + BOT_PANEL_H
 
 
 	var fontMu sync.Mutex
@@ -84,9 +84,9 @@ func run() {
 		ButtonHover:	  color.RGBA{45,   45,  45, 255},
 		ButtonBlink:	  color.RGBA{70,   70,  70, 255},
 
-		SeekerBackground: color.RGBA{140,   0,   0, 255},
-		SeekerFrame:	  color.RGBA{120,   0,  30, 255},
-		SeekerCursor:	  color.RGBA{220,   20,  50, 255},
+		SeekerFrame:	  color.RGBA{140,   0,   0, 255},
+		SeekerBackground: color.RGBA{120,   0,  30, 255},
+		SeekerCursor:	  color.RGBA{220,  20,  50, 255},
 
 		FontFace:		  fontFace,
 	}
@@ -108,6 +108,8 @@ func run() {
 	animationToggle  := make(chan bool)
 	framesChanged    := make(chan int)
 	cursorChanged    := make(chan int)
+	seekerChanged    := make(chan int)
+
 
 	mux, env := gui.NewMux(w)
 
@@ -120,10 +122,10 @@ func run() {
 		go Button(mux.MakeEnv(), "Play/Pause Animation", colorTheme, image.Rect(xa, 1*(BTN_H+MARGIN_BOT), xb, 1*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu, func() {
 			animationToggle <- true
 		})
-		go Button(mux.MakeEnv(), "Load SPHUGO File", colorTheme, image.Rect(xa, 2*(BTN_H+MARGIN_BOT), xb, 2*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu, func() {
+		go Button(mux.MakeEnv(), "Load Configuration", colorTheme, image.Rect(xa, 2*(BTN_H+MARGIN_BOT), xb, 2*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu, func() {
 
 		})
-		go Button(mux.MakeEnv(), "Render mp4", colorTheme, image.Rect(xa, 3*(BTN_H+MARGIN_BOT), xb, 3*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu, func() {
+		go Button(mux.MakeEnv(), "Render to mp4", colorTheme, image.Rect(xa, 3*(BTN_H+MARGIN_BOT), xb, 3*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu, func() {
 
 		})
 
@@ -135,23 +137,36 @@ func run() {
 	{
 		go Simulator(mux.MakeEnv(), simulationToggle, framesChanged, &simulation)
 
-		go Renderer(mux.MakeEnv(), animationToggle, framesChanged, cursorChanged,
+		go Renderer(mux.MakeEnv(), animationToggle, framesChanged, cursorChanged, seekerChanged,
 			image.Rect(0, 0, RENDERER_W, RENDERER_H), &simulation)
 
-		go Seeker(mux.MakeEnv(), framesChanged, cursorChanged,
+		go Seeker(mux.MakeEnv(), framesChanged, cursorChanged, seekerChanged,
 			image.Rect(0, RENDERER_H, RENDERER_W, RENDERER_H+SEEKER_H), colorTheme)
 
-		//go DataViewer(mux.MakeEnv(), framesChanged, cursorChanged, r image.Rectangle, simulation *tg.Simulation)
+		go DataViewer(mux.MakeEnv(), framesChanged, cursorChanged,
+			image.Rect(0, RENDERER_H + SEEKER_H, RENDERER_W, RENDERER_H+SEEKER_H+BOT_PANEL_H), colorTheme, &simulation)
 
 	}
 
+
+	simulationToggle <- true
+	animationToggle <- true
+
+
 	// we use the master env now, w is used by the mux
 	for event := range env.Events() {
-		switch event.(type) {
+		switch ev := event.(type) {
 		case win.WiClose:
 			close(env.Draw())
 		case win.KbDown:
-			close(env.Draw())
+			switch ev.Key {
+			case win.KeyEscape:
+				close(env.Draw())
+			case win.KeySpace:
+				animationToggle<- true
+			}
+		case win.KbType:
+			//fmt.Println(ev.String())
 		}
 	}
 }
@@ -178,7 +193,7 @@ func Simulator(env gui.Env, simToggle <-chan bool, framesChanged chan<- int, sim
 }
 
 
-func Seeker(env gui.Env, framesCh chan int, cursorCh chan int,
+func Seeker(env gui.Env, framesCh chan int, cursorCh chan int, seekerChanged chan<- int,
 		r image.Rectangle, colorTheme *Theme) {
 
 	frameCount := 0
@@ -187,8 +202,12 @@ func Seeker(env gui.Env, framesCh chan int, cursorCh chan int,
 	// draws the seeker at a given position
 	drawSeeker := func(frameCount, cursorPos int) func(draw.Image) image.Rectangle {
 
-		if cursorPos > frameCount{
+		if cursorPos >= frameCount && frameCount != 0{
 			panic("cursor pos higher that frame count!")
+		}
+
+		if frameCount == 0 {
+			frameCount = 1
 		}
 
 		return func(drw draw.Image) image.Rectangle {
@@ -203,27 +222,22 @@ func Seeker(env gui.Env, framesCh chan int, cursorCh chan int,
 			//
 			// draw frame hints
 			//
-			// width W, framewidth f, and padding 2, number of frames N
-			// pixel and margin:     f 2 f 2 f
-			//                   i = 0   1   2
-			//
-			// x values left: i*W/N
-			// x values rigt: (i+1)*(w/N) - 2
-			imgUni = image.NewUniform(colorTheme.SeekerFrame)
+
+			imgUni     = image.NewUniform(colorTheme.SeekerFrame)
 			frameRect := r
 
+			frameSx := float32(r.Dx()) / float32(frameCount)
+			frameDx := float32(r.Dx()) / float32(frameCount) - float32(SEEKER_FRAME_MARGIN)
 
-			// upper bound for number of frame displayed
-			cap := r.Dx()/SEEKER_FRAME_MARGIN/2
-			cappedFrameCount := frameCount
-			if cappedFrameCount > cap {
-				cappedFrameCount = cap
-			}
-
-			for i := range cappedFrameCount {
-				frameRect.Min.X = int((float32(r.Dx()) / float32(cappedFrameCount)) * float32(i) )
-				frameRect.Max.X = int((float32(r.Dx()) / float32(cappedFrameCount)) * float32(i+1) - SEEKER_FRAME_MARGIN)
-				draw.Draw(drw, frameRect, imgUni, image.ZP, draw.Src)
+			if frameDx <= SEEKER_MIN_W {
+				draw.Draw(drw, r, imgUni, image.ZP, draw.Src)
+				frameDx = float32(SEEKER_MIN_W)
+			} else {
+				for i := range frameCount {
+					frameRect.Min.X = int(frameSx * float32(i))
+					frameRect.Max.X = int(frameSx * float32(i) + frameDx)
+					draw.Draw(drw, frameRect, imgUni, image.ZP, draw.Src)
+				}
 			}
 
 			//
@@ -231,45 +245,90 @@ func Seeker(env gui.Env, framesCh chan int, cursorCh chan int,
 			//
 
 			imgUni = image.NewUniform(colorTheme.SeekerCursor)
+
+			cursorW := Min(int(frameDx), int(SEEKER_W))
+			cursorOffset := image.Point{int(frameDx/2) - cursorW/2, 0}
 			cursorRect := r
-			if frameCount == 0 {
-				frameCount = 1
-			}
 			cursorRect.Min.X = int((float32(r.Dx()) / float32(frameCount)) * float32(cursorPos) )
-			cursorRect.Max.X = cursorRect.Min.X + SEEKER_W
-			draw.Draw(drw, cursorRect, imgUni, image.ZP, draw.Src)
+			cursorRect.Max.X = cursorRect.Min.X + cursorW
+			cursorRect = cursorRect.Add(cursorOffset)
+
+			draw.Draw(drw, cursorRect.Intersect(r), imgUni, image.ZP, draw.Src)
 			return r
 		}
 	}
 
-	env.Draw() <- drawSeeker(0, 0)
-
+	needRedraw := true
+	pressed := false
 	for {
 		select {
 		case newCount := <-framesCh:
 			frameCount = newCount
-			env.Draw() <- drawSeeker(frameCount, cursorPos)
+			needRedraw = true
 		case newPos := <-cursorCh:
 			cursorPos = newPos
-			env.Draw() <- drawSeeker(frameCount, cursorPos)
+			needRedraw = true
+		case event := <-env.Events():
+			switch event := event.(type) {
+				case win.MoDown:
+					if event.Point.In(r) && frameCount != 0 {
+						cursorPos = int(float32(event.Point.X) / float32(RENDERER_W) * float32(frameCount))
+						fmt.Println(cursorPos)
+						seekerChanged <- cursorPos
+						pressed = true
+						needRedraw = true
+					}
+				case win.MoUp:
+					pressed = false
+				case win.MoMove:
+					if pressed && frameCount != 0{
+						oldCursorPos := cursorPos
+						cursorPos = int(float32(event.Point.X) / float32(RENDERER_W) * float32(frameCount))
+						if cursorPos >= frameCount {
+							cursorPos = frameCount - 1
+						}
+						if cursorPos < 0 {
+							cursorPos = 0
+						}
+
+						if oldCursorPos != cursorPos {
+							fmt.Println(cursorPos)
+							needRedraw = true
+							seekerChanged <- cursorPos
+							time.Sleep(time.Second / 60)
+						}
+					}
+			}
+
+		}
+
+		if needRedraw {
+			nerfedCursorPos := cursorPos
+			if cursorPos >= frameCount && frameCount != 0 {
+				nerfedCursorPos = frameCount - 1
+			}
+			env.Draw() <- drawSeeker(frameCount, nerfedCursorPos)
+			needRedraw = false
 		}
 	}
 
 }
 
 
-func Renderer(env gui.Env, aniToggle <-chan bool, framesCh chan<- int, cursorCh chan int,
+func Renderer(env gui.Env, aniToggle <-chan bool, framesCh chan<- int, cursorCh chan int, seekerChanged <-chan int,
 		r image.Rectangle, simulation *tg.Simulation) {
 
-	env.Draw() <- func(drw draw.Image) image.Rectangle {
-		img := image.NewUniform(color.RGBA{0,0,0,255})
-		draw.Draw(drw, r, img, image.ZP, draw.Src)
-		return r
-	}
-
 	drawFrame := func(i int) func(draw.Image) image.Rectangle {
+		if i > 0 {
+			return func(drw draw.Image) image.Rectangle {
+				draw.Draw(drw, r, simulation.Frames[i], image.ZP, draw.Src)
+				return r
+			}
+		}
+
 		return func(drw draw.Image) image.Rectangle {
-			draw.Draw(drw, r, simulation.Frames[i], image.ZP, draw.Src)
+			img := image.NewUniform(color.RGBA{0,0,0,255})
+			draw.Draw(drw, r, img, image.ZP, draw.Src)
 			return r
 		}
 	}
@@ -277,10 +336,15 @@ func Renderer(env gui.Env, aniToggle <-chan bool, framesCh chan<- int, cursorCh 
 	running := false
 	step := 0
 
+	env.Draw() <- drawFrame(step)
+
 	for {
 		select{
 		case <- aniToggle:
 			running = !running
+		case frameNumber := <- seekerChanged:
+			step = frameNumber
+			env.Draw() <- drawFrame(step)
 		default:
 			if running && simulation != nil {
 				if step >= len(simulation.Frames) {
@@ -296,11 +360,11 @@ func Renderer(env gui.Env, aniToggle <-chan bool, framesCh chan<- int, cursorCh 
 }
 
 func DataViewer(env gui.Env, framesCh chan<- int, cursorCh chan int,
-					r image.Rectangle, simulation *tg.Simulation) {
+					r image.Rectangle, colorTheme *Theme, simulation *tg.Simulation) {
 
 
 	env.Draw() <- func(drw draw.Image) image.Rectangle {
-		img := image.NewUniform(color.RGBA{0,100,0,255})
+		img := image.NewUniform(colorTheme.Background)
 		draw.Draw(drw, r, img, image.ZP, draw.Src)
 		return r
 	}
@@ -395,6 +459,20 @@ func Button(env gui.Env, text string, colorTheme *Theme,
 	}
 
 	close(env.Draw())
+}
+
+func Min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func Max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 

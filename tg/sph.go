@@ -33,10 +33,10 @@ func MakeSimulation() (Simulation){
 
 	var sim Simulation
 
-	sim.Gamma = 1.3
+	sim.Gamma = 1.7
 	sim.NSteps = 10000
-	sim.DeltaTHalf = 0.004
-	sim.NParticles = 10_000
+	sim.DeltaTHalf = 0.003
+	sim.NParticles = 2_000
 
 	particles := make([]Particle, sim.NParticles)
 	//InitSpecial(particles)
@@ -98,7 +98,7 @@ func InitEvenly(particles []Particle) {
 	}
 	for i, _ := range particles {
 		particles[i].Z = rand.Int()
-		particles[i].E = 0.001
+		particles[i].E = 0.1
 	}
 }
 
@@ -168,40 +168,43 @@ func (sim *Simulation) Step(step int) {
 		/*// Periodic Boundary: particles outside boundary get moved back
 		for i, _ := range sim.Root.Particles {
 			p := &sim.Root.Particles[i]
-			if p.Pos.X >= 1.5 {
-				p.Pos.X -= 2
-			}
-			if p.Pos.Y >= 1.5 {
-				p.Pos.Y -= 2
-			}
-
-			if p.Pos.X < -0.5 {
-				p.Pos.X += 2
-			}
-
-			if p.Pos.Y < -0.5 {
-				p.Pos.Y += 2
-			}
-		}*/
-
-		for i, _ := range sim.Root.Particles {
-			p := &sim.Root.Particles[i]
 			if p.Pos.X >= 1 {
-				p.Vel.X = -p.Vel.X
+				p.Pos.X -= 1
 			}
 			if p.Pos.Y >= 1 {
-				p.Vel.Y = -p.Vel.Y
-
+				p.Pos.Y -= 1
 			}
+
 			if p.Pos.X < 0 {
-				p.Vel.X = -p.Vel.X
+				p.Pos.X += 1
 			}
 
 			if p.Pos.Y < 0 {
+				p.Pos.Y += 1
+			}
+		} */
+
+
+		for i, _ := range sim.Root.Particles {
+			p := &sim.Root.Particles[i]
+
+			if p.Pos.X >= 1 {
+				p.Vel.X = -p.Vel.X
+			}
+
+			if p.Pos.Y >= 1 {
 				p.Vel.Y = -p.Vel.Y
 			}
-		}
 
+			if p.Pos.X < 0 {
+				p.Vel.X = -p.Vel.X
+				p.Pos.X = -p.Pos.X
+			}
+
+			//if p.Pos.Y < 0 {
+			//	p.Vel.Y = -p.Vel.Y*0.9
+			//}
+		}
 
 		log.Printf("Calculated step %v/%v", step, sim.NSteps)
 
@@ -377,8 +380,8 @@ func AccelerationAndEDotMonahan2D(p *Particle, gammaFactor float64) {
 	// clamp energy change
 	acc_edot = math.Max(math.Min(acc_edot, 10), 0)
 
-	acc := Vec2{acc_ax, acc_ay}
-    acc = acc.Mul(-6*40/(math.Pi*maxR*maxR*maxR*7))
+	acc := Vec2{acc_ax, acc_ay + 0.00004}
+    acc = acc.Mul(6*40/(math.Pi*maxR*maxR*maxR*7))
 	p.VDot = acc
 	p.EDot = acc_edot
 	//fmt.Println(p.EDot, p.VDot, p.VPred, p.C)
