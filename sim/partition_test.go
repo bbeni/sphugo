@@ -2,7 +2,7 @@
 	Tests for Partition() function
 */
 
-package tg
+package sim
 
 import (
 	"testing"

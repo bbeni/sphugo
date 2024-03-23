@@ -9,7 +9,7 @@ For more info and implementation details see tg/tree-partition.go
 package main
 
 import (
-	"github.com/bbeni/sphugo/tg"
+	"github.com/bbeni/sphugo/sim"
 )
 
 // Configuration
@@ -30,19 +30,19 @@ const (
 
 func main() {
 
-	var particles [N_PARTICLES]tg.Particle
-	tg.InitUniformly(particles[:])
+	var particles [N_PARTICLES]sim.Particle
+	sim.InitUniformly(particles[:])
 
-	root := tg.Cell{
-		LowerLeft: tg.Vec2{0, 0},
-		UpperRight: tg.Vec2{1, 1},
+	root := sim.Cell{
+		LowerLeft: sim.Vec2{0, 0},
+		UpperRight: sim.Vec2{1, 1},
 		Particles: particles[:],
 	}
 
-	root.Treebuild(tg.Vertical)
+	root.Treebuild(sim.Vertical)
 	//root.Dumptree(0)
 
-	canvas := tg.MakeTreePlot(&root, IMAGE_W, IMAGE_H)
+	canvas := sim.MakeTreePlot(&root, IMAGE_W, IMAGE_H)
 	canvas.ToPNG(TREE_PNG_FNAME)
 
 }

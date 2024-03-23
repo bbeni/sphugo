@@ -20,8 +20,7 @@ TODOs:
 		- [x] Find Min/Max
 		- [x] Extract Min/Max
 */
-
-package tg
+package sim
 
 import (
 	"fmt"

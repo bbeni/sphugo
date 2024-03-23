@@ -1,14 +1,14 @@
 /* Visualization stuff for Simulations */
-package tg
+package sim
 
 import (
-	"github.com/bbeni/sphugo/gx"
+	"github.com/bbeni/sphugo/gfx"
 )
 
-func MakeTreePlot(root* Cell, w, h int) (gx.Canvas) {
+func MakeTreePlot(root* Cell, w, h int) (gfx.Canvas) {
 
-	var canvas = gx.NewCanvas(w, h)
-	canvas.Clear(gx.BLACK)
+	var canvas = gfx.NewCanvas(w, h)
+	canvas.Clear(gfx.BLACK)
 
 	// Draw the compartiment cells
 	PlotCells(canvas, root, 0, root.Depth())
@@ -17,21 +17,21 @@ func MakeTreePlot(root* Cell, w, h int) (gx.Canvas) {
 	for _, particle := range root.Particles {
 		x := int(particle.Pos.X * float64(canvas.W))
 		y := int(particle.Pos.Y * float64(canvas.H))
-		canvas.DrawPoint(x, y, gx.WHITE)
+		canvas.DrawPoint(x, y, gfx.WHITE)
 	}
 
 	// draw a rainbow on lower left corner
 	for i := range 256 {
-		lower_left := gx.Vec2i{i, h}
-		upper_right := gx.Vec2i{i, h-10}
-		canvas.DrawLine(lower_left, upper_right, gx.RainbowRamp(uint8(i)))
+		lower_left := gfx.Vec2i{i, h}
+		upper_right := gfx.Vec2i{i, h-10}
+		canvas.DrawLine(lower_left, upper_right, gfx.RainbowRamp(uint8(i)))
 	}
 	return canvas
 }
 
 // draws rectangles for each cell. the higher the level,
 // the color of the rect is more towards violet in rainbow
-func PlotCells(canvas gx.Canvas, root *Cell, color_index, max_color_index int) {
+func PlotCells(canvas gfx.Canvas, root *Cell, color_index, max_color_index int) {
 	x1 := int(root.LowerLeft.X * float64(canvas.W))
 	y1 := int(root.LowerLeft.Y * float64(canvas.H))
 	x2 := int(root.UpperRight.X * float64(canvas.W))
@@ -45,12 +45,12 @@ func PlotCells(canvas gx.Canvas, root *Cell, color_index, max_color_index int) {
 		PlotCells(canvas, root.Upper, color_index + 1, max_color_index)
 	}
 
-	canvas.DrawRect(gx.Vec2i{x1, y1}, gx.Vec2i{x2 - 1, y2 - 1}, gx.RainbowRamp(uint8(color_index*256/max_color_index)))
+	canvas.DrawRect(gfx.Vec2i{x1, y1}, gfx.Vec2i{x2 - 1, y2 - 1}, gfx.RainbowRamp(uint8(color_index*256/max_color_index)))
 }
 
 // Draw Bounding Circles of leaf nodes in Cell
 // max_depth should be >= 1
-func PlotBoundingCircles (c gx.Canvas, root *Cell, max_depth int, color gx.Color) {
+func PlotBoundingCircles (c gfx.Canvas, root *Cell, max_depth int, color gfx.Color) {
 
 	// only plot up to max_depth
 	if root.Depth() <= max_depth {

@@ -1,10 +1,10 @@
 package main
 
 import (
-	"github.com/bbeni/sphugo/tg"
+	"github.com/bbeni/sphugo/sim"
 )
 
 func main() {
-	sim := tg.MakeSimulation()
-	sim.Run()
+	sph := sim.MakeSimulation()
+	sph.Run()
 }

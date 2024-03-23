@@ -11,7 +11,7 @@ package main
 import (
 	"fmt"
 	"math/rand"
-	"github.com/bbeni/sphugo/tg"
+	"github.com/bbeni/sphugo/sim"
 )
 
 /* Heap indexed in the following way:
@@ -35,22 +35,22 @@ func main() {
 	fmt.Printf("\n")
 	fmt.Printf("initial array was:    %v\n", array)
 
-	tg.BuildHeap(array)
+	sim.BuildHeap(array)
 
 	fmt.Printf("after heapification:  %v\n\n", array)
 	fmt.Println("visualisation to check for correctness:")
-	tg.DumpHeap(array)
+	sim.DumpHeap(array)
 
 	fmt.Println("Insert 0 into the Heap:")
-	array = tg.Insert(array, 0)
-	tg.DumpHeap(array)
+	array = sim.Insert(array, 0)
+	sim.DumpHeap(array)
 
-	array, _, _ = tg.ExtractMin(array)
+	array, _, _ = sim.ExtractMin(array)
 	fmt.Print("ExtractMin from Heap:\n\n")
-	tg.DumpHeap(array)
+	sim.DumpHeap(array)
 
-	array, _, _ = tg.Replace(array, 33)
+	array, _, _ = sim.Replace(array, 33)
 	fmt.Print("Replace with 33 with root node:\n\n")
-	tg.DumpHeap(array)
+	sim.DumpHeap(array)
 
 }

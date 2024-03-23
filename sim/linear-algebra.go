@@ -1,6 +1,7 @@
 /* Linear Algebra functions and types
 */
-package tg
+package sim
+
 
 import (
 	"math"

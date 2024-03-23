@@ -18,7 +18,7 @@ import (
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 
-	"github.com/bbeni/sphugo/tg"
+	"github.com/bbeni/sphugo/sim"
 )
 
 // TODO: remove later
@@ -38,7 +38,7 @@ const (
 	SEEKER_MIN_W = 8
 	SEEKER_FRAME_MARGIN = 4
 
-	BOT_PANEL_H = 240
+	BOT_PANEL_H = 220
 )
 
 type Theme struct {
@@ -110,7 +110,6 @@ func run() {
 	cursorChanged    := make(chan int)
 	seekerChanged    := make(chan int)
 
-
 	mux, env := gui.NewMux(w)
 
 	{
@@ -128,17 +127,18 @@ func run() {
 		go Button(mux.MakeEnv(), "Render to mp4", colorTheme, image.Rect(xa, 3*(BTN_H+MARGIN_BOT), xb, 3*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu, func() {
 
 		})
-
 	}
 
 
-	simulation := tg.MakeSimulation()
+	simulation := sim.MakeSimulation()
+	//simulation.Step()
+	animator   := sim.MakeAnimator(&simulation)
 
 	{
-		go Simulator(mux.MakeEnv(), simulationToggle, framesChanged, &simulation)
+		go Simulator(mux.MakeEnv(), simulationToggle, framesChanged, &simulation, &animator)
 
 		go Renderer(mux.MakeEnv(), animationToggle, framesChanged, cursorChanged, seekerChanged,
-			image.Rect(0, 0, RENDERER_W, RENDERER_H), &simulation)
+			image.Rect(0, 0, RENDERER_W, RENDERER_H), &animator)
 
 		go Seeker(mux.MakeEnv(), framesChanged, cursorChanged, seekerChanged,
 			image.Rect(0, RENDERER_H, RENDERER_W, RENDERER_H+SEEKER_H), colorTheme)
@@ -171,27 +171,25 @@ func run() {
 	}
 }
 
-func Simulator(env gui.Env, simToggle <-chan bool, framesChanged chan<- int, simulation *tg.Simulation) {
 
-	simulation.Init()
+// Background Process for starting/stopping simulation
+func Simulator(env gui.Env, simToggle <-chan bool, framesChanged chan<- int,
+	simulation *sim.Simulation, animator *sim.Animator) {
 
 	running := false
-	step := 0
-
 	for {
 		select {
-		case _ = <-simToggle:
+		case <-simToggle:
 			running = !running
 		default:
 			if running {
-				simulation.Step(step)
-				step += 1
-				framesChanged <- len(simulation.Frames)
+				simulation.Step()
+				animator.Frame()
+				framesChanged <- len(animator.Frames)
 			}
 		}
 	}
 }
-
 
 func Seeker(env gui.Env, framesCh chan int, cursorCh chan int, seekerChanged chan<- int,
 		r image.Rectangle, colorTheme *Theme) {
@@ -316,12 +314,12 @@ func Seeker(env gui.Env, framesCh chan int, cursorCh chan int, seekerChanged cha
 
 
 func Renderer(env gui.Env, aniToggle <-chan bool, framesCh chan<- int, cursorCh chan int, seekerChanged <-chan int,
-		r image.Rectangle, simulation *tg.Simulation) {
+		r image.Rectangle, animator *sim.Animator) {
 
 	drawFrame := func(i int) func(draw.Image) image.Rectangle {
 		if i > 0 {
 			return func(drw draw.Image) image.Rectangle {
-				draw.Draw(drw, r, simulation.Frames[i], image.ZP, draw.Src)
+				draw.Draw(drw, r, animator.Frames[i], image.ZP, draw.Src)
 				return r
 			}
 		}
@@ -346,8 +344,8 @@ func Renderer(env gui.Env, aniToggle <-chan bool, framesCh chan<- int, cursorCh 
 			step = frameNumber
 			env.Draw() <- drawFrame(step)
 		default:
-			if running && simulation != nil {
-				if step >= len(simulation.Frames) {
+			if running && animator != nil {
+				if step >= len(animator.Frames) {
 					step = 0
 				}
 				env.Draw() <- drawFrame(step)
@@ -360,7 +358,7 @@ func Renderer(env gui.Env, aniToggle <-chan bool, framesCh chan<- int, cursorCh 
 }
 
 func DataViewer(env gui.Env, framesCh chan<- int, cursorCh chan int,
-					r image.Rectangle, colorTheme *Theme, simulation *tg.Simulation) {
+					r image.Rectangle, colorTheme *Theme, simulation *sim.Simulation) {
 
 
 	env.Draw() <- func(drw draw.Image) image.Rectangle {

@@ -10,7 +10,7 @@ Example code:
 	canvas.DrawDisk(150,150,30,gx.RED)
 	canvas.ToPNG("test.png")
 */
-package gx
+package gfx
 
 import (
 	"os"
