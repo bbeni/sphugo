@@ -1,6 +1,7 @@
 package main
 
 import (
+	"slices"
 	"image"
 	"image/draw"
 	"image/color"
@@ -53,6 +54,10 @@ type Theme struct {
 	SeekerFrame		 color.RGBA
 	SeekerCursor	 color.RGBA
 
+	ProfilerForeground color.RGBA
+	ProfilerBackground color.RGBA
+	ProfilerCursor     color.RGBA
+
 	FontFace	   font.Face
 }
 
@@ -77,7 +82,7 @@ func run() {
 	}
 
 	colorTheme := &Theme{
-		Background:  	  color.RGBA{18,   18,  18, 255},
+		Background:  	  color.RGBA{24,   24,  24, 255},
 
 		ButtonText: 	  color.RGBA{255, 250, 240, 255}, // Floral White
 		ButtonUp:   	  color.RGBA{36,   33,  36, 255}, // Raisin Black
@@ -87,6 +92,10 @@ func run() {
 		SeekerFrame:	  color.RGBA{140,   0,   0, 255},
 		SeekerBackground: color.RGBA{120,   0,  30, 255},
 		SeekerCursor:	  color.RGBA{220,  20,  50, 255},
+
+		ProfilerForeground: color.RGBA{10,  180,  20, 255},
+		ProfilerBackground: color.RGBA{24,   24,  24, 255},
+		ProfilerCursor:     color.RGBA{48,   48,  48, 255},
 
 		FontFace:		  fontFace,
 	}
@@ -104,11 +113,15 @@ func run() {
 		return r
 	}
 
+
+	// TODO: cleanup this mess, too many channels and/or missleading names!
 	simulationToggle := make(chan bool)
 	animationToggle  := make(chan bool)
 	framesChanged    := make(chan int)
-	cursorChanged    := make(chan int)
-	seekerChanged    := make(chan int)
+	cursorChanged    := make(chan int, 1000)
+	seekerChanged1   := make(chan int, 1000)
+	seekerChanged2   := make(chan int, 1000)
+	energyProfiler   := make(chan float64)
 
 	mux, env := gui.NewMux(w)
 
@@ -131,26 +144,33 @@ func run() {
 
 
 	simulation := sim.MakeSimulation()
-	//simulation.Step()
 	animator   := sim.MakeAnimator(&simulation)
 
 	{
-		go Simulator(mux.MakeEnv(), simulationToggle, framesChanged, &simulation, &animator)
+		go Simulator(mux.MakeEnv(),
+			simulationToggle,
+			framesChanged, energyProfiler,
+			&simulation, &animator)
 
-		go Renderer(mux.MakeEnv(), animationToggle, framesChanged, cursorChanged, seekerChanged,
+		go Renderer(mux.MakeEnv(),
+			animationToggle, seekerChanged1,
+			cursorChanged, seekerChanged2,
 			image.Rect(0, 0, RENDERER_W, RENDERER_H), &animator)
 
-		go Seeker(mux.MakeEnv(), framesChanged, cursorChanged, seekerChanged,
+		go Seeker(mux.MakeEnv(),
+			framesChanged, cursorChanged,
+			seekerChanged1, seekerChanged2,
 			image.Rect(0, RENDERER_H, RENDERER_W, RENDERER_H+SEEKER_H), colorTheme)
 
-		go DataViewer(mux.MakeEnv(), framesChanged, cursorChanged,
+		go DataViewer(mux.MakeEnv(),
+			framesChanged, seekerChanged2, energyProfiler,
 			image.Rect(0, RENDERER_H + SEEKER_H, RENDERER_W, RENDERER_H+SEEKER_H+BOT_PANEL_H), colorTheme, &simulation)
 
 	}
 
 
-	simulationToggle <- true
-	animationToggle <- true
+	//simulationToggle <- true
+	//animationToggle <- true
 
 
 	// we use the master env now, w is used by the mux
@@ -163,7 +183,7 @@ func run() {
 			case win.KeyEscape:
 				close(env.Draw())
 			case win.KeySpace:
-				animationToggle<- true
+				animationToggle <- true
 			}
 		case win.KbType:
 			//fmt.Println(ev.String())
@@ -173,7 +193,9 @@ func run() {
 
 
 // Background Process for starting/stopping simulation
-func Simulator(env gui.Env, simToggle <-chan bool, framesChanged chan<- int,
+func Simulator(env gui.Env,
+	simToggle <-chan bool, 										// input
+	framesChanged chan<- int, energyProfiler chan<- float64,    // output
 	simulation *sim.Simulation, animator *sim.Animator) {
 
 	running := false
@@ -184,15 +206,19 @@ func Simulator(env gui.Env, simToggle <-chan bool, framesChanged chan<- int,
 		default:
 			if running {
 				simulation.Step()
+				energy := simulation.TotalEnergy()
 				animator.Frame()
-				framesChanged <- len(animator.Frames)
+				framesChanged  <- len(animator.Frames)
+				energyProfiler <- energy
 			}
 		}
 	}
 }
 
-func Seeker(env gui.Env, framesCh chan int, cursorCh chan int, seekerChanged chan<- int,
-		r image.Rectangle, colorTheme *Theme) {
+func Seeker(env gui.Env,
+	framesCh <-chan int, cursorCh <-chan int,   // input
+	seekerChanged1, seekerChanged2 chan<- int,  // output
+	r image.Rectangle, colorTheme *Theme) {
 
 	frameCount := 0
 	cursorPos  := 0
@@ -200,7 +226,7 @@ func Seeker(env gui.Env, framesCh chan int, cursorCh chan int, seekerChanged cha
 	// draws the seeker at a given position
 	drawSeeker := func(frameCount, cursorPos int) func(draw.Image) image.Rectangle {
 
-		if cursorPos >= frameCount && frameCount != 0{
+		if cursorPos >= frameCount && frameCount != 0 {
 			panic("cursor pos higher that frame count!")
 		}
 
@@ -271,8 +297,8 @@ func Seeker(env gui.Env, framesCh chan int, cursorCh chan int, seekerChanged cha
 				case win.MoDown:
 					if event.Point.In(r) && frameCount != 0 {
 						cursorPos = int(float32(event.Point.X) / float32(RENDERER_W) * float32(frameCount))
-						fmt.Println(cursorPos)
-						seekerChanged <- cursorPos
+						seekerChanged1 <- cursorPos
+						seekerChanged2 <- cursorPos
 						pressed = true
 						needRedraw = true
 					}
@@ -290,10 +316,9 @@ func Seeker(env gui.Env, framesCh chan int, cursorCh chan int, seekerChanged cha
 						}
 
 						if oldCursorPos != cursorPos {
-							fmt.Println(cursorPos)
 							needRedraw = true
-							seekerChanged <- cursorPos
-							time.Sleep(time.Second / 60)
+							seekerChanged1 <- cursorPos
+							seekerChanged2 <- cursorPos
 						}
 					}
 			}
@@ -307,64 +332,144 @@ func Seeker(env gui.Env, framesCh chan int, cursorCh chan int, seekerChanged cha
 			}
 			env.Draw() <- drawSeeker(frameCount, nerfedCursorPos)
 			needRedraw = false
+			//time.Sleep(time.Second / 200)
 		}
 	}
 
 }
 
 
-func Renderer(env gui.Env, aniToggle <-chan bool, framesCh chan<- int, cursorCh chan int, seekerChanged <-chan int,
-		r image.Rectangle, animator *sim.Animator) {
+func Renderer(env gui.Env,
+	aniToggle <-chan bool, seekerChanged1 <-chan int, // input
+	cursorCh chan<- int, seekerChanged2	chan<- int,	 // output
+	r image.Rectangle, animator *sim.Animator) {
 
 	drawFrame := func(i int) func(draw.Image) image.Rectangle {
-		if i > 0 {
+
+		if i == 0 && len(animator.Frames) == 0 {
 			return func(drw draw.Image) image.Rectangle {
-				draw.Draw(drw, r, animator.Frames[i], image.ZP, draw.Src)
+				img := image.NewUniform(color.RGBA{0,0,0,255})
+				draw.Draw(drw, r, img, image.ZP, draw.Src)
 				return r
 			}
 		}
 
 		return func(drw draw.Image) image.Rectangle {
-			img := image.NewUniform(color.RGBA{0,0,0,255})
-			draw.Draw(drw, r, img, image.ZP, draw.Src)
+			draw.Draw(drw, r, animator.Frames[i], image.ZP, draw.Src)
 			return r
 		}
+
 	}
 
+	needsRedraw := false
 	running := false
 	step := 0
 
 	env.Draw() <- drawFrame(step)
 
+
+	// TODO: decouple animation and event loop
+	// maybe not here the lag happens! probably in other part of code
 	for {
 		select{
 		case <- aniToggle:
 			running = !running
-		case frameNumber := <- seekerChanged:
+		case frameNumber := <-seekerChanged1:
 			step = frameNumber
-			env.Draw() <- drawFrame(step)
+
+			out:
+			for _ = range 10 {
+				time.Sleep(time.Second / 300)
+				select {
+				case fn := <-seekerChanged1:
+					step = fn
+				default:
+					break out
+				}
+			}
+
+			needsRedraw = true
 		default:
+
+			if animator != nil && !running && needsRedraw {
+				env.Draw() <- drawFrame(step)
+				needsRedraw = false
+			}
+
 			if running && animator != nil {
 				if step >= len(animator.Frames) {
 					step = 0
 				}
+				cursorCh       <- step
+				seekerChanged2 <- step
 				env.Draw() <- drawFrame(step)
 				step += 1
-				cursorCh <- step
+
 				time.Sleep(time.Second / 60)
 			}
 		}
 	}
 }
 
-func DataViewer(env gui.Env, framesCh chan<- int, cursorCh chan int,
-					r image.Rectangle, colorTheme *Theme, simulation *sim.Simulation) {
+func DataViewer(env gui.Env,
+	framesCh <-chan int, seekerChanged <-chan int, energyProfiler <-chan float64, // input
+	r image.Rectangle, colorTheme *Theme, simulation *sim.Simulation) {
 
+	redraw := func(energies []float64, cursorPos int) func(drw draw.Image) image.Rectangle {
+		return func(drw draw.Image) image.Rectangle {
 
-	env.Draw() <- func(drw draw.Image) image.Rectangle {
-		img := image.NewUniform(colorTheme.Background)
-		draw.Draw(drw, r, img, image.ZP, draw.Src)
-		return r
+			col    := image.NewUniform(colorTheme.ProfilerForeground)
+			curCol := image.NewUniform(colorTheme.ProfilerCursor)
+			bgCol  := image.NewUniform(colorTheme.ProfilerBackground)
+
+			draw.Draw(drw, r, bgCol, image.ZP, draw.Src)
+
+			frameCount := len(energies)
+
+			if frameCount == 0 {
+				return r
+			}
+
+			minE := slices.Max(energies)
+			maxE := slices.Min(energies)
+			dE   := maxE - minE
+			dx   := float32(r.Dx()) / float32(frameCount)
+
+			// draw cursor
+			{
+				rect := r
+				rect.Min.X = int(dx * float32(cursorPos))
+				rect.Max.X = int(dx * float32(cursorPos + 1))
+				draw.Draw(drw, rect.Intersect(r), curCol, image.ZP, draw.Src)
+			}
+
+			// draw energy scaled to height
+			rect := r
+			for i := range frameCount {
+				h := int((energies[i] - minE) / dE * float64(r.Dy())) + r.Min.Y
+				rect.Min.X = int(dx * float32(i))
+				rect.Max.X = int(dx * float32(i+1))
+				rect.Min.Y = h
+				rect.Max.Y = h+4
+				draw.Draw(drw, rect, col, image.ZP, draw.Src)
+			}
+
+			return r
+		}
+	}
+
+	cursorPos := 0
+	energies  := make([]float64, 0)
+	env.Draw() <- redraw(energies, cursorPos)
+
+	for {
+		select {
+		case cursorPos = <-seekerChanged:
+			env.Draw() <- redraw(energies, cursorPos)
+		case energy := <-energyProfiler:
+			energies = append(energies, energy)
+			env.Draw() <- redraw(energies, cursorPos)
+		}
 	}
 
 }
