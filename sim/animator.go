@@ -3,6 +3,9 @@ package sim
 import (
 	"image"
 	"math"
+	"log"
+	"os"
+	"image/png"
 
 	"github.com/bbeni/sphugo/gfx"
 	//"sync"
@@ -49,9 +52,7 @@ func MakeAnimator(simulation *Simulation) Animator {
 }
 
 
-// render the last frame of the simultion
-func (ani *Animator) Frame() {
-
+func (ani *Animator) CurrentFrame() gfx.Canvas {
 	//
 	// order according to z-value
 	//
@@ -60,6 +61,7 @@ func (ani *Animator) Frame() {
 		//return int(p.Rho*100000)
 		return -p.Z
 	}
+
 	QuickSort(ani.renderingParticleArray, extractZindex)
 
 	canvas := gfx.NewCanvas(1280, 720)
@@ -73,10 +75,14 @@ func (ani *Animator) Frame() {
 		//color_index := 255 - uint8((particle.Rho - 1)*64)
 		//color_index := 255 - uint8(zNormalized * 256)
 
-		color_index := uint8(math.Min(float64(particle.Rho/float64(len(ani.Simulation.Particles)*3)*256), 255))
-		//color := gfx.ParaRamp(color_index)
+		m := ani.Simulation.ParticleMass
+		colorFormula := float64(particle.Rho/(m* float64(len(ani.Simulation.Particles)*30))*256)
+		//colorFormula := float64(particle.Vel.Norm()*256)
+
+		color_index := uint8(math.Min(colorFormula, 255))
+		color := gfx.ParaRamp(color_index)
 		//color := gfx.HeatRamp(color_index)
-		color := gfx.ToxicRamp(color_index)
+		//color := gfx.ToxicRamp(color_index)
 		//color := gfx.RainbowRamp(color_index)
 
 
@@ -86,14 +92,46 @@ func (ani *Animator) Frame() {
 		}
 
 		//canvas.DrawDisk(float32(x), float32(y), zNormalized*zNormalized*20+1, color)
-		canvas.DrawDisk(float32(x), float32(y), 8, color)
+		canvas.DrawDisk(float32(x), float32(y), 4, color)
 	}
+	return canvas
+}
 
-	//canvas.ToPNG(fmt.Sprintf("./out/%.4v.png", sim.Step))
 
-	img := canvas.Img
+// save the last frame of the simultion in the buffer
+func (ani *Animator) Frame() {
+
+	canvas := ani.CurrentFrame()
 
 	//ani.FramesMu.Lock()
-	ani.Frames = append(ani.Frames, img)
+	ani.Frames = append(ani.Frames, canvas.Img)
 	//ani.FramesMu.Unlock()
+}
+
+
+
+
+func (ani *Animator) FrameToPNG(file_path string) bool {
+	if ani.ActiveFrame == -1 {
+		log.Printf("Error: No frame to render, because no Frames in Animator!")
+		return false
+	}
+
+	i := ani.ActiveFrame
+
+	file, err := os.Create(file_path)
+	defer file.Close()
+
+	if err != nil {
+		log.Fatalf("Error: couldn't create file %q : %q", file_path, err)
+		os.Exit(1)
+	}
+
+	err = png.Encode(file, ani.Frames[i])
+	if err != nil {
+		log.Fatalf("Error: couldn't encode PNG %q : %q", file_path, err)
+		os.Exit(1)
+	}
+
+	return true
 }

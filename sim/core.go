@@ -30,12 +30,14 @@ type Particle struct {
 	VPred Vec2    // Predicted Velicty
 	// 96 bytes until now
 
+	// TODO: move this out of particles so we have smaller particle size! -> cache locality
 	// @Speed might be bad because we have a big particle size now
 	// should rather keep it seperate to prevent cache misses?
 	// for now we just naively implement it like this
 	// 32*(8+8)  = 512 bytes
 	NearestNeighbours [NN_SIZE]*Particle
 	NNDists 		  [NN_SIZE]float64
+	NNPos			  [NN_SIZE]Vec2     // keep track of position,  we need to know because of periodic b.c.
 
 	// visualisation trick for depth rendering
 	Z int
@@ -162,7 +164,7 @@ func Partition (ps []Particle, orientation Orientation, middle float64) (a, b []
  the specific direction for left/total or top/total. */
 
 func (root *Cell) Treebuild (orientation Orientation) {
-	
+
 
 	// dirty fix: particles out of [0, 1] x [0, 1] will grow cells indefinitely
 	// MAX_PARTICLES_PER_CELL not satisfied...
@@ -176,7 +178,7 @@ func (root *Cell) Treebuild (orientation Orientation) {
 	} else {
 		mid = SPLIT_FRACTION * root.LowerLeft.X + (1 - SPLIT_FRACTION) * root.UpperRight.X
 	}
-	
+
 	a, b := Partition(root.Particles, orientation, mid)
 
 	if len(a) > 0 {

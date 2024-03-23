@@ -45,7 +45,7 @@ func (particle *Particle) findNNRec(root *Cell, offset Vec2) {
 
 			// if the dist is lower than max dist and the particle is not itself!
 			if d2 < particle.NNQueuePeekKey() && particle != &root.Particles[i] {
-				particle.NNQueueInsert(d2, &root.Particles[i])
+				particle.NNQueueInsert(d2, &root.Particles[i], root.Particles[i].Pos.Sub(&offset))
 			}
 		}
 		return
@@ -103,9 +103,10 @@ func (p *Particle) NNQueuePeekKey() float64 {
 	return p.NNDists[0]
 }
 
-func (p *Particle) NNQueueInsert(dist float64, neighbour *Particle) {
+func (p *Particle) NNQueueInsert(dist float64, neighbour *Particle, realPos Vec2) {
 	p.NNDists[0] = dist
 	p.NearestNeighbours[0] = neighbour
+	p.NNPos[0] = realPos
 	NNQueueHeapify(p, 0)
 }
 
@@ -114,6 +115,7 @@ func (p *Particle) NNQueueInitSentinel() {
 	for i := range NN_SIZE {
 		p.NNDists[i] = math.MaxFloat64
 		p.NearestNeighbours[i] = nil
+		p.NNPos[i] = Vec2{}
 	}
 }
 
@@ -138,6 +140,7 @@ func NNQueueHeapify(p *Particle, i int) {
 		// swap elements
 		p.NNDists[i], p.NNDists[max_index] = p.NNDists[max_index], p.NNDists[i]
 		p.NearestNeighbours[i], p.NearestNeighbours[max_index] = p.NearestNeighbours[max_index], p.NearestNeighbours[i]
+		p.NNPos[i], p.NNPos[max_index] = p.NNPos[max_index], p.NNPos[i]
 
 		i = max_index
 	}

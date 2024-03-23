@@ -8,9 +8,7 @@ import (
 	"time"
 	"sync"
 	"fmt"
-	"os"
 	"log"
-	"image/png"
 
 	"github.com/faiface/gui"
 	"github.com/faiface/gui/win"
@@ -156,26 +154,9 @@ func run() {
 		go Button(mux.MakeEnv(), "Current Frame to .png", colorTheme,
 			image.Rect(xa, 4*(BTN_H+MARGIN_BOT), xb, 4*(BTN_H+MARGIN_BOT)+BTN_H),
 			&fontMu, func() {
-				if animator.ActiveFrame == -1 {
-					log.Printf("Error: No frame to render, because no Frames in Animator!")
-					return
-				}
 				i := animator.ActiveFrame
-
 				file_path := fmt.Sprintf("frame%v.png", i)
-				file, err := os.Create(file_path)
-				defer file.Close()
-				if err != nil {
-					log.Fatalf("Error: couldn't create file %q : %q", file_path, err)
-					os.Exit(1)
-				}
-
-				err = png.Encode(file, animator.Frames[i])
-				if err != nil {
-					log.Fatalf("Error: couldn't encode PNG %q : %q", file_path, err)
-					os.Exit(1)
-				}
-
+				animator.FrameToPNG(file_path)
 				log.Printf("Created PNG %s.", file_path)
 		})
 	}
@@ -240,8 +221,8 @@ func Simulator(env gui.Env,
 		default:
 			if running {
 				simulation.Step()
-				//energy := simulation.TotalEnergy()
-				energy := simulation.TotalDensity()
+				energy := simulation.TotalEnergy()
+				//energy := simulation.TotalDensity()
 
 				animator.Frame()
 				framesChanged  <- len(animator.Frames)

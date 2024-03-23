@@ -21,6 +21,8 @@ type Simulation struct {
 	Gamma float64 // heat capacity ratio = 1+2/f
 	DeltaTHalf float64
 	NSteps int
+	ConstAcc Vec2
+	ParticleMass float64
 }
 
 
@@ -29,15 +31,18 @@ func MakeSimulation() (Simulation){
 
 	var sim Simulation
 
-	sim.Gamma = 1.7
+	sim.Gamma = 1.6666
 	sim.NSteps = 10000
-	sim.DeltaTHalf = 0.003
-	nParticles := 500
+	sim.DeltaTHalf = 0.006
+	sim.ConstAcc = Vec2{0, 2.2}
+	sim.ParticleMass = 0.5
 
+	nParticles := 10000
 	particles := make([]Particle, nParticles)
 	//InitSpecial(particles)
-	InitEvenly(particles)
+	//InitEvenly(particles)
 	//InitEvenlyVelGradient(particles)
+	InitBlock(particles)
 
 	sim.Particles = particles
 	sim.Root = MakeCells(particles, Vertical)
@@ -94,9 +99,26 @@ func InitEvenly(particles []Particle) {
 	}
 	for i, _ := range particles {
 		particles[i].Z = rand.Int()
-		particles[i].E = 0.1
+		particles[i].E = 0.01
 	}
 }
+
+func InitBlock(particles []Particle) {
+	if USE_RANDOM_SEED {
+		rand.Seed(time.Now().UnixNano())
+	} else {
+	    rand.Seed(12345678)
+	}
+
+	for i, _ := range particles {
+		particles[i].Pos = Vec2{rand.Float64()/6, rand.Float64()}
+	}
+	for i, _ := range particles {
+		particles[i].Z = rand.Int()
+		particles[i].E = 0.01
+	}
+}
+
 
 
 
@@ -133,8 +155,10 @@ func (sim *Simulation) Step() {
 		// drift 1 for leapfrog dt/2
 		for i, _ := range sim.Root.Particles {
 			p      := &sim.Root.Particles[i]
+
 			vdt    := p.Vel.Mul(sim.DeltaTHalf)
 			p.Pos   = p.Pos.Add(&vdt)
+
 			adt    := p.VDot.Mul(sim.DeltaTHalf)
 			p.VPred = p.Vel.Add(&adt)
 			p.EPred = p.E + p.EDot * sim.DeltaTHalf
@@ -153,26 +177,45 @@ func (sim *Simulation) Step() {
 		// drift 2 for leapfrog dt/2
 		for i, _ := range sim.Root.Particles {
 			p := &sim.Root.Particles[i]
+
 			vdt    := p.Vel.Mul(sim.DeltaTHalf)
 			p.Pos   = p.Pos.Add(&vdt)
 		}
 
-		// Periodic Boundary: particles outside boundary get moved back
+		// Boundary: particles outside boundary get moved back
 		for i, _ := range sim.Root.Particles {
 			p := &sim.Root.Particles[i]
 			if p.Pos.X >= 1 {
 				p.Pos.X -= 1
+
+				// refelction kind
+				// and set pos back to almost 1
+				p.Vel.X *= -1
+				p.Pos.X  = 0.99999
 			}
 			if p.Pos.Y >= 1 {
-				p.Pos.Y -= 1
+				// periodic
+				// p.Pos.Y -= 1
+
+				// refelction kind
+				// and set pos back to almost 1
+				p.Vel.Y *= -1
+				p.Pos.Y  = 0.99999
 			}
 
 			if p.Pos.X < 0 {
 				p.Pos.X += 1
+
+				// refelction kind
+				// and set pos back to almost 1
+				p.Vel.X *= -1
+				p.Pos.X  = 0.01
 			}
 
 			if p.Pos.Y < 0 {
-				p.Pos.Y += 1
+
+				//p.Pos.Y += 1
+
 			}
 		}
 
@@ -245,8 +288,7 @@ func DensityTopHat2D(p *Particle) (float64) {
 }
 
 
-// lets assume mass 1 per particle, so the density is just the 1/volume of sphere
-func DensityMonahan2D(p *Particle) (float64) {
+func DensityMonahan2D(p *Particle, sim *Simulation) (float64) {
 	maxR := p.NNDists[0]
 
 	acc := 0.0
@@ -267,68 +309,95 @@ func DensityMonahan2D(p *Particle) (float64) {
 		acc += (1 - x)*(1 - x)*(1 - x) / 3
 	}
 
-	return acc*6*40/(math.Pi*maxR*maxR*7)
+	return sim.ParticleMass*acc*6*40/(math.Pi*maxR*maxR*7)
 }
 
-// lets assume mass 1 per particle, so the density is just the 1/volume of sphere
-// viscosity PIab not implemented
+
 // - Sum [ (Pa/rhoa^2       + Pb/rhob^2     + PIab )]
 //			contribution A  + contributionB
-func AccelerationAndEDotMonahan2D(p *Particle, gammaFactor float64) {
+func AccelerationAndEDotMonahan2D(p *Particle, sim *Simulation) {
 	maxR := p.NNDists[0]
 
-	contributionA := p.C*p.C / (gammaFactor*p.Rho)
+	// PA / rhoA^2
+	contributionA := p.C*p.C / (sim.Gamma*p.Rho)
 	contributionB := 0.0
 
-	nablaAKernel := 0.0
+	dRKernel := 0.0
 
 	acc_ax := 0.0
 	acc_ay := 0.0
 	acc_edot := 0.0
 
-	var x float64
+	var q float64
 	var i int
 	for i = range NN_SIZE {
 		nn := p.NearestNeighbours[i]
-		x = p.NNDists[i]/maxR 			// r/h in lecture
+		q   = p.NNDists[i]/maxR 			// r/h in lecture
 
-		if x > 1 || x < 0 {
-			panic("unreachable")
+		if q > 1 || q < 0 {
+			panic("kernel parameter q not in [0, 1]!")
 		}
 
-		if x < 0.5 {
-			nablaAKernel = (3*x*x - 2*x) / p.NNDists[i]
+		//
+		// Kernel
+		//
+
+		// TODO: make it exchangable easily
+		if q < 0.5 {
+			dRKernel = (3*q*q - 2*q)
 		} else {
-		 	nablaAKernel = -(1 - x)*(1 - x) / p.NNDists[i]
+		 	dRKernel = -(1 - q)*(1 - q)
 		}
 
-		// clamp kernel
-		clamp := 0.9
-		nablaAKernel = math.Max(math.Min(nablaAKernel, clamp), -clamp)
+		// PB / rhoB^2
+		contributionB = nn.C*nn.C / (sim.Gamma*nn.Rho)
 
-		contributionB = nn.C*nn.C / (gammaFactor*nn.Rho)
 
-		rX := (p.Pos.X - nn.Pos.X)
-		rY := (p.Pos.Y - nn.Pos.Y)
-		acc_ax += rX * (contributionA + contributionB) * nablaAKernel
-		acc_ay += rY * (contributionA + contributionB) * nablaAKernel
-		acc_edot += (rY * (p.VPred.X - nn.VPred.X) + rY * (p.VPred.Y - nn.VPred.Y)) * nablaAKernel
+		vA := p.VPred
+		vB := nn.VPred
+		//vA := p.Vel
+		//vB := nn.Vel
 
+		rA := p.Pos
+		rB := p.NNPos[i]
+
+		//
+		// Viscosity Term
+		//
+
+		vAB   := vB.Sub(&vA)
+		rAB   := rB.Sub(&rA)
+		dot   := vAB.Dot(&rAB)
+		piAB  := 0.0
+		if dot < 0 {
+			const (
+				alpha = 0.75
+				beta  = 1.5
+				etaSq = 0.01
+			)
+			cAB   := 0.5 * (p.C + nn.C)
+			rhoAB := 0.5 * (p.Rho + p.Rho)
+			hAB   := 0.5 * (p.NNDists[0] + nn.NNDists[0])
+			muAB  := dot * hAB / (rAB.Dot(&rAB) + etaSq)
+			piAB  = (-alpha*cAB*muAB + beta*muAB*muAB) / rhoAB
+		}
+
+
+
+		if rAB.X > 0.5 || rAB.Y > 0.5 {
+			panic("rX or rY is bigger than expected. more than half boundary")
+		}
+
+		acc_ax += rAB.X * (piAB + contributionA + contributionB) * dRKernel / p.NNDists[i]
+		acc_ay += rAB.Y * (piAB + contributionA + contributionB) * dRKernel / p.NNDists[i]
+		acc_edot += dot * dRKernel
 	}
 
-	// clamp acceleration
-	clamp := 0.9
-	acc_ax = math.Max(math.Min(acc_ax, clamp), -clamp)
-	acc_ay = math.Max(math.Min(acc_ay, clamp), -clamp)
-
-	// clamp energy change
-	acc_edot = math.Max(math.Min(acc_edot, 10), 0)
-
 	acc := Vec2{acc_ax, acc_ay}
-    acc = acc.Mul(6*40/(math.Pi*maxR*maxR*maxR*7))
+    acc = acc.Mul(6*40*sim.ParticleMass/(math.Pi*maxR*maxR*maxR*7))
+    acc = acc.Add(&sim.ConstAcc)
 	p.VDot = acc
-	p.EDot = acc_edot
-	//fmt.Println(p.EDot, p.VDot, p.VPred, p.C)
+	p.EDot = contributionA * acc_edot * sim.ParticleMass // Benz formulation
 }
 
 
@@ -350,8 +419,8 @@ func (sim *Simulation) CalculateForces() {
 		// TODO(#3): implement NN density
 		for i, _ := range sim.Root.Particles {
 			p := &sim.Root.Particles[i]
-			p.Rho = DensityTopHat2D(p)
-			//p.Rho = DensityMonahan2D(p)
+			//p.Rho = DensityTopHat2D(p)
+			p.Rho = DensityMonahan2D(p, sim)
 			//fmt.Println(p.Rho)
 		}
 	}
@@ -373,7 +442,7 @@ func (sim *Simulation) CalculateForces() {
 	{
 		// TODO(#4): implement NN forces
 		for i, _ := range sim.Root.Particles {
-			AccelerationAndEDotMonahan2D(&sim.Root.Particles[i], sim.Gamma)
+			AccelerationAndEDotMonahan2D(&sim.Root.Particles[i], sim)
 		}
 	}
 
