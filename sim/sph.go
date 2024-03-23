@@ -32,11 +32,12 @@ func MakeSimulation() (Simulation){
 	sim.Gamma = 1.7
 	sim.NSteps = 10000
 	sim.DeltaTHalf = 0.003
-	nParticles := 2_000
+	nParticles := 500
 
 	particles := make([]Particle, nParticles)
 	//InitSpecial(particles)
 	InitEvenly(particles)
+	//InitEvenlyVelGradient(particles)
 
 	sim.Particles = particles
 	sim.Root = MakeCells(particles, Vertical)
@@ -156,7 +157,7 @@ func (sim *Simulation) Step() {
 			p.Pos   = p.Pos.Add(&vdt)
 		}
 
-		/*// Periodic Boundary: particles outside boundary get moved back
+		// Periodic Boundary: particles outside boundary get moved back
 		for i, _ := range sim.Root.Particles {
 			p := &sim.Root.Particles[i]
 			if p.Pos.X >= 1 {
@@ -173,18 +174,20 @@ func (sim *Simulation) Step() {
 			if p.Pos.Y < 0 {
 				p.Pos.Y += 1
 			}
-		} */
+		}
 
 
-		for i, _ := range sim.Root.Particles {
+		/*for i, _ := range sim.Root.Particles {
 			p := &sim.Root.Particles[i]
 
 			if p.Pos.X >= 1 {
 				p.Vel.X = -p.Vel.X
+				p.Pos.X = -p.Pos.X
 			}
 
 			if p.Pos.Y >= 1 {
 				p.Vel.Y = -p.Vel.Y*0.8
+				p.Pos.Y = -p.Pos.Y
 			}
 
 			if p.Pos.X < 0 {
@@ -195,7 +198,7 @@ func (sim *Simulation) Step() {
 			//if p.Pos.Y < 0 {
 			//	p.Vel.Y = -p.Vel.Y*0.9
 			//}
-		}
+		}*/
 	}
 
 	sim.CurrentStep += 1
@@ -321,7 +324,7 @@ func AccelerationAndEDotMonahan2D(p *Particle, gammaFactor float64) {
 	// clamp energy change
 	acc_edot = math.Max(math.Min(acc_edot, 10), 0)
 
-	acc := Vec2{acc_ax, acc_ay + 0.00004}
+	acc := Vec2{acc_ax, acc_ay}
     acc = acc.Mul(6*40/(math.Pi*maxR*maxR*maxR*7))
 	p.VDot = acc
 	p.EDot = acc_edot
@@ -347,11 +350,12 @@ func (sim *Simulation) CalculateForces() {
 		// TODO(#3): implement NN density
 		for i, _ := range sim.Root.Particles {
 			p := &sim.Root.Particles[i]
-			//p.Rho = DensityTopHat2D(p)
-			p.Rho = DensityMonahan2D(p)
+			p.Rho = DensityTopHat2D(p)
+			//p.Rho = DensityMonahan2D(p)
 			//fmt.Println(p.Rho)
 		}
 	}
+
 
 	// Calculate speed of sound
 	// c = sqrt(gamma(gamma-1)ePred)
@@ -384,6 +388,22 @@ func (sim *Simulation) TotalEnergy() float64 {
 	tot := 0.0
 	for i := range sim.Particles {
 		tot += sim.Particles[i].E
+	}
+	return tot
+}
+
+func (sim *Simulation) TotalDensity() float64 {
+	tot := 0.0
+	for i := range sim.Particles {
+		tot += sim.Particles[i].Rho
+	}
+	return tot
+}
+
+func (sim *Simulation) TotalMomentum() float64 {
+	tot := 0.0
+	for i := range sim.Particles {
+		tot = sim.Particles[i].Vel.Norm()
 	}
 	return tot
 }

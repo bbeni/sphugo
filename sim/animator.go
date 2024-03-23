@@ -21,6 +21,9 @@ type Animator struct {
 	// reference to particles
 	// also used to order particles acoording to z-value before rendering
 	renderingParticleArray []*Particle
+
+	// TODO: Gui state, should be moved to simviewer.go!
+	ActiveFrame int
 }
 
 func MakeAnimator(simulation *Simulation) Animator {
@@ -39,6 +42,8 @@ func MakeAnimator(simulation *Simulation) Animator {
 
 	ani.Simulation = simulation
 	ani.Frames = make([]image.Image, 0, simulation.NSteps)
+
+	ani.ActiveFrame = -1
 
 	return ani
 }

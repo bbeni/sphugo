@@ -8,6 +8,9 @@ import (
 	"time"
 	"sync"
 	"fmt"
+	"os"
+	"log"
+	"image/png"
 
 	"github.com/faiface/gui"
 	"github.com/faiface/gui/win"
@@ -35,7 +38,7 @@ const (
 	MARGIN_BOT = 4
 
 	SEEKER_H   = 24
-	SEEKER_W   = 16
+	SEEKER_W   = 36
 	SEEKER_MIN_W = 8
 	SEEKER_FRAME_MARGIN = 4
 
@@ -82,16 +85,16 @@ func run() {
 	}
 
 	colorTheme := &Theme{
-		Background:  	  color.RGBA{24,   24,  24, 255},
+		Background:  	 	color.RGBA{24,   24,  24, 255},
 
-		ButtonText: 	  color.RGBA{255, 250, 240, 255}, // Floral White
-		ButtonUp:   	  color.RGBA{36,   33,  36, 255}, // Raisin Black
-		ButtonHover:	  color.RGBA{45,   45,  45, 255},
-		ButtonBlink:	  color.RGBA{70,   70,  70, 255},
+		ButtonText: 	 	color.RGBA{255, 250, 240, 255}, // Floral White
+		ButtonUp:   	 	color.RGBA{36,   33,  36, 255}, // Raisin Black
+		ButtonHover:	 	color.RGBA{45,   45,  45, 255},
+		ButtonBlink:	 	color.RGBA{70,   70,  70, 255},
 
-		SeekerFrame:	  color.RGBA{140,   0,   0, 255},
-		SeekerBackground: color.RGBA{120,   0,  30, 255},
-		SeekerCursor:	  color.RGBA{220,  20,  50, 255},
+		SeekerFrame:	 	color.RGBA{140,   0,   0, 255},
+		SeekerBackground:	color.RGBA{120,   0,  30, 255},
+		SeekerCursor:	 	color.RGBA{220,  20,  50, 255},
 
 		ProfilerForeground: color.RGBA{10,  180,  20, 255},
 		ProfilerBackground: color.RGBA{24,   24,  24, 255},
@@ -113,14 +116,16 @@ func run() {
 		return r
 	}
 
+	simulation := sim.MakeSimulation()
+	animator   := sim.MakeAnimator(&simulation)
 
 	// TODO: cleanup this mess, too many channels and/or missleading names!
 	simulationToggle := make(chan bool)
 	animationToggle  := make(chan bool)
 	framesChanged    := make(chan int)
-	cursorChanged    := make(chan int, 1000)
-	seekerChanged1   := make(chan int, 1000)
-	seekerChanged2   := make(chan int, 1000)
+	cursorChanged    := make(chan int)
+	seekerChanged1   := make(chan int)
+	seekerChanged2   := make(chan int)
 	energyProfiler   := make(chan float64)
 
 	mux, env := gui.NewMux(w)
@@ -128,23 +133,52 @@ func run() {
 	{
 		xa := W - PANEL_W
 		xb := W
-		go Button(mux.MakeEnv(), "Run/Stop Simulation", colorTheme, image.Rect(xa, 0, xb, BTN_H), &fontMu, func() {
-			simulationToggle <- true
+		go Button(mux.MakeEnv(), "Run/Stop Simulation", colorTheme,
+			image.Rect(xa, 0, xb, BTN_H),
+			&fontMu, func() {
+				simulationToggle <- true
 		})
-		go Button(mux.MakeEnv(), "Play/Pause Animation", colorTheme, image.Rect(xa, 1*(BTN_H+MARGIN_BOT), xb, 1*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu, func() {
-			animationToggle <- true
+		go Button(mux.MakeEnv(), "Play/Pause Animation", colorTheme,
+			image.Rect(xa, 1*(BTN_H+MARGIN_BOT), xb, 1*(BTN_H+MARGIN_BOT)+BTN_H),
+			&fontMu, func() {
+				animationToggle <- true
 		})
-		go Button(mux.MakeEnv(), "Load Configuration", colorTheme, image.Rect(xa, 2*(BTN_H+MARGIN_BOT), xb, 2*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu, func() {
+		go Button(mux.MakeEnv(), "Load Configuration", colorTheme,
+			image.Rect(xa, 2*(BTN_H+MARGIN_BOT), xb, 2*(BTN_H+MARGIN_BOT)+BTN_H),
+			&fontMu, func() {
 
 		})
-		go Button(mux.MakeEnv(), "Render to mp4", colorTheme, image.Rect(xa, 3*(BTN_H+MARGIN_BOT), xb, 3*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu, func() {
+		go Button(mux.MakeEnv(), "Render to .mp4", colorTheme,
+			image.Rect(xa, 3*(BTN_H+MARGIN_BOT), xb, 3*(BTN_H+MARGIN_BOT)+BTN_H),
+			&fontMu, func() {
 
+		})
+		go Button(mux.MakeEnv(), "Current Frame to .png", colorTheme,
+			image.Rect(xa, 4*(BTN_H+MARGIN_BOT), xb, 4*(BTN_H+MARGIN_BOT)+BTN_H),
+			&fontMu, func() {
+				if animator.ActiveFrame == -1 {
+					log.Printf("Error: No frame to render, because no Frames in Animator!")
+					return
+				}
+				i := animator.ActiveFrame
+
+				file_path := fmt.Sprintf("frame%v.png", i)
+				file, err := os.Create(file_path)
+				defer file.Close()
+				if err != nil {
+					log.Fatalf("Error: couldn't create file %q : %q", file_path, err)
+					os.Exit(1)
+				}
+
+				err = png.Encode(file, animator.Frames[i])
+				if err != nil {
+					log.Fatalf("Error: couldn't encode PNG %q : %q", file_path, err)
+					os.Exit(1)
+				}
+
+				log.Printf("Created PNG %s.", file_path)
 		})
 	}
-
-
-	simulation := sim.MakeSimulation()
-	animator   := sim.MakeAnimator(&simulation)
 
 	{
 		go Simulator(mux.MakeEnv(),
@@ -206,7 +240,9 @@ func Simulator(env gui.Env,
 		default:
 			if running {
 				simulation.Step()
-				energy := simulation.TotalEnergy()
+				//energy := simulation.TotalEnergy()
+				energy := simulation.TotalDensity()
+
 				animator.Frame()
 				framesChanged  <- len(animator.Frames)
 				energyProfiler <- energy
@@ -250,16 +286,15 @@ func Seeker(env gui.Env,
 			imgUni     = image.NewUniform(colorTheme.SeekerFrame)
 			frameRect := r
 
-			frameSx := float32(r.Dx()) / float32(frameCount)
-			frameDx := float32(r.Dx()) / float32(frameCount) - float32(SEEKER_FRAME_MARGIN)
+			frameDx := float32(r.Dx()) / float32(frameCount)
 
 			if frameDx <= SEEKER_MIN_W {
 				draw.Draw(drw, r, imgUni, image.ZP, draw.Src)
 				frameDx = float32(SEEKER_MIN_W)
 			} else {
 				for i := range frameCount {
-					frameRect.Min.X = int(frameSx * float32(i))
-					frameRect.Max.X = int(frameSx * float32(i) + frameDx)
+					frameRect.Min.X = int(frameDx * float32(i))   + SEEKER_FRAME_MARGIN / 2
+					frameRect.Max.X = int(frameDx * float32(i+1)) - SEEKER_FRAME_MARGIN / 2
 					draw.Draw(drw, frameRect, imgUni, image.ZP, draw.Src)
 				}
 			}
@@ -271,7 +306,7 @@ func Seeker(env gui.Env,
 			imgUni = image.NewUniform(colorTheme.SeekerCursor)
 
 			cursorW := Min(int(frameDx), int(SEEKER_W))
-			cursorOffset := image.Point{int(frameDx/2) - cursorW/2, 0}
+			cursorOffset := image.Point{int(frameDx/2 - float32(cursorW)/2), 0}
 			cursorRect := r
 			cursorRect.Min.X = int((float32(r.Dx()) / float32(frameCount)) * float32(cursorPos) )
 			cursorRect.Max.X = cursorRect.Min.X + cursorW
@@ -322,7 +357,6 @@ func Seeker(env gui.Env,
 						}
 					}
 			}
-
 		}
 
 		if needRedraw {
@@ -332,7 +366,7 @@ func Seeker(env gui.Env,
 			}
 			env.Draw() <- drawSeeker(frameCount, nerfedCursorPos)
 			needRedraw = false
-			//time.Sleep(time.Second / 200)
+			time.Sleep(time.Second / 300)
 		}
 	}
 
@@ -353,6 +387,8 @@ func Renderer(env gui.Env,
 				return r
 			}
 		}
+
+		animator.ActiveFrame = i
 
 		return func(drw draw.Image) image.Rectangle {
 			draw.Draw(drw, r, animator.Frames[i], image.ZP, draw.Src)
@@ -436,10 +472,11 @@ func DataViewer(env gui.Env,
 			dx   := float32(r.Dx()) / float32(frameCount)
 
 			// draw cursor
+			// TODO: make cursor here and in seeker behave the same
 			{
 				rect := r
 				rect.Min.X = int(dx * float32(cursorPos))
-				rect.Max.X = int(dx * float32(cursorPos + 1))
+				rect.Max.X = int(dx * float32(cursorPos)) + Max(int(dx), SEEKER_MIN_W)
 				draw.Draw(drw, rect.Intersect(r), curCol, image.ZP, draw.Src)
 			}
 
@@ -450,7 +487,7 @@ func DataViewer(env gui.Env,
 				rect.Min.X = int(dx * float32(i))
 				rect.Max.X = int(dx * float32(i+1))
 				rect.Min.Y = h
-				rect.Max.Y = h+4
+				rect.Max.Y = h+2
 				draw.Draw(drw, rect, col, image.ZP, draw.Src)
 			}
 
