@@ -76,7 +76,7 @@ func (ani *Animator) CurrentFrame() gfx.Canvas {
 		//color_index := 255 - uint8(zNormalized * 256)
 
 		m := ani.Simulation.ParticleMass
-		colorFormula := float64(particle.Rho/(m* float64(len(ani.Simulation.Particles)*30))*256)
+		colorFormula := float64(particle.Rho/(m* float64(len(ani.Simulation.Particles)*10))*256)
 		//colorFormula := float64(particle.Vel.Norm()*256)
 
 		color_index := uint8(math.Min(colorFormula, 255))

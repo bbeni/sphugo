@@ -1,0 +1,43 @@
+//	Config file for SPHUGO SPH Simulation
+//  This is an example configuration.
+//  <- This is a line comment (only allowed at start of line)
+
+[[Simulation]]
+
+[Constants]
+NSteps				1000
+Gamma 				1.666
+ParticleMass		1
+// A 2-D Vector 	X		Y 		components
+Acceleration		0		1.5
+DeltaTHalf			0.004
+
+// Coordinates of viewport for animation
+[Viewport]
+UpperLeft			0		0
+LowerRight			1		1
+
+// Initial configuration
+[[Start]]
+[UniformRect]
+NParticles			1000
+UpperLeft			0		0
+LowerRight			0.3		0.7
+
+// Per default boundaries are open
+[[Boundaries]]
+[Periodic]
+Left				0
+Right				1
+
+// A reflection reflects particles without losing momentum
+[Reflection]
+// A refelection line orthognal to origin that refelcts towards origin
+ToOrigin			0		0.9
+// A reflection boundary taht excludes origin (top-left corner)
+FromOrigin			0.2		0.2
+
+[[Sources]]
+[Point]
+Pos					0.2		0.2
+Rate				100

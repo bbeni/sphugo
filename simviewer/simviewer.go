@@ -598,5 +598,10 @@ func Max(a, b int) int {
 
 
 func main() {
-	mainthread.Run(run)
+	fname := "example.sph-config"
+	config := sim.MakeConfig(sim.Tokenize(fname))
+	fmt.Println(config)
+
+	_ = mainthread.Run
+	//mainthread.Run(run)
 }

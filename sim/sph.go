@@ -31,13 +31,13 @@ func MakeSimulation() (Simulation){
 
 	var sim Simulation
 
-	sim.Gamma = 1.6666
+	sim.Gamma = 2 //1.6666
 	sim.NSteps = 10000
-	sim.DeltaTHalf = 0.006
-	sim.ConstAcc = Vec2{0, 2.2}
+	sim.DeltaTHalf = 0.003
+	sim.ConstAcc = Vec2{1.2, 1.2}
 	sim.ParticleMass = 0.5
 
-	nParticles := 10000
+	nParticles := 1000
 	particles := make([]Particle, nParticles)
 	//InitSpecial(particles)
 	//InitEvenly(particles)
@@ -111,7 +111,7 @@ func InitBlock(particles []Particle) {
 	}
 
 	for i, _ := range particles {
-		particles[i].Pos = Vec2{rand.Float64()/6, rand.Float64()}
+		particles[i].Pos = Vec2{rand.Float64()*4/6, rand.Float64()*4/5}
 	}
 	for i, _ := range particles {
 		particles[i].Z = rand.Int()
