@@ -9,7 +9,6 @@ import (
 
 // Configuration
 const (
-	N_PARTICLES 			= 2200
 	MAX_PARTICLES_PER_CELL  = 8
 	SPLIT_FRACTION 			= 0.5   // Fraction of left to total space for Treebuild(), usually 0.5.
 	USE_RANDOM_SEED 		= false // for generating randomly distributed particles in init_uniformly()

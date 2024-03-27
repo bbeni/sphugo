@@ -21,8 +21,6 @@ type Simulation struct {
 	IsBusy  sync.Mutex
 }
 
-
-// TODO(#1): Make it more customizable
 func MakeSimulation() (Simulation){
 
 	sim := Simulation {
@@ -36,14 +34,18 @@ func MakeSimulation() (Simulation){
 	return sim
 }
 
-
 func MakeSimulationFromConfig(configFilePath string) (Simulation) {
+	conf:= MakeConfigFromFile(configFilePath)
+	sim := MakeSimulationFromConf(conf)
+	return sim
+}
 
+func MakeSimulationFromConf(conf SphConfig) (Simulation){
 	sim := Simulation {
-		Config: MakeConfigFromFile(configFilePath),
+		Config: conf,
 	}
 
-	ps := make([]Particle, 0, 10000)
+	ps := make([]Particle, 0, 100000)
 
 	for _, startSpawner := range sim.Config.Start {
 		ps = append(ps, startSpawner.Spawn(0)...)
@@ -55,6 +57,8 @@ func MakeSimulationFromConfig(configFilePath string) (Simulation) {
 	return sim
 
 }
+
+
 
 func (sim *Simulation) Run() {
 	for step := range sim.Config.NSteps {
