@@ -2,50 +2,72 @@ package sim
 
 import (
 	"math"
+	"fmt"
 )
+
+// TODO: remove
+var _ = fmt.Print
 
 
 // recursively find all nearest neighbors of a particle based on position
 // make sure you call it on the top/root Cell!!
 //
 // TODO: implement it using a loop
-func (particle *Particle) FindNearestNeighbours(root *Cell) {
-	particle.NNQueueInitSentinel()
-	particle.findNNRec(root, Vec2{0, 0})
+func (sim *Simulation) FindNearestNeighbours() {
+
+	sim.NNQueueInitSentinel()
+
+	for i := range sim.Particles {
+		sim.findNNRec(sim.Root, i, Vec2{0, 0})
+	}
 
 	// make dists use Sqrt
-	for i := range NN_SIZE {
-		particle.NNDists[i] = math.Sqrt(particle.NNDists[i])
+	// and set h value
+	for i := range sim.Particles {
+		for j := range NN_SIZE {
+			sim.NNDists[i][j] = math.Sqrt(sim.NNDists[i][j])
+		}
+		sim.Particles[i].h = sim.NNDists[i][0]
 	}
 }
 
 // Periodic version
 // assuming particles are between x = (0, 1], y = (0, 1]
-func (particle *Particle) FindNearestNeighboursPeriodic(root *Cell) {
-	particle.NNQueueInitSentinel()
-	for i:=-1.0; i<=1; i++ {
-		for j:=-1.0; j<=1; j++ {
-			particle.findNNRec(root, Vec2{i, j})
+func (sim *Simulation) FindNearestNeighboursPeriodic() {
+
+	sim.NNQueueInitSentinel()
+
+	for k := range sim.Particles {
+		for i:=-1.0; i<=1; i++ {
+			for j:=-1.0; j<=1; j++ {
+				sim.findNNRec(sim.Root, k, Vec2{i, j})
+			}
 		}
 	}
 	// make dists use Sqrt
-	for i := range NN_SIZE {
-		particle.NNDists[i] = math.Sqrt(particle.NNDists[i])
+	// and set h value
+	for i := range sim.Particles {
+		for j := range NN_SIZE {
+			sim.NNDists[i][j] = math.Sqrt(sim.NNDists[i][j])
+		}
+		sim.Particles[i].h = sim.NNDists[i][0]
 	}
 }
 
 
 // TODO: @Speed fix Sqrts
-func (particle *Particle) findNNRec(root *Cell, offset Vec2) {
+func (sim *Simulation) findNNRec(root *Cell, particleIndex int, offset Vec2) {
 
-	pos := particle.Pos.Add(&offset)
+	pos := sim.Particles[particleIndex].Pos.Add(&offset)
+	particle := &sim.Particles[particleIndex]
+
 	if root.Upper == nil && root.Lower == nil {
 		for i := range root.Particles {
 			d2 := DistSq(pos, root.Particles[i].Pos)
 
 			// if the dist is lower than max dist and the particle is not itself!
-			if d2 < particle.NNQueuePeekKey() && particle != &root.Particles[i] {
-				particle.NNQueueInsert(d2, &root.Particles[i], root.Particles[i].Pos.Sub(&offset))
+			if d2 < sim.NNQueuePeekKey(particleIndex) && particle != &root.Particles[i] {
+				sim.NNQueueInsert(particleIndex, d2, &root.Particles[i], root.Particles[i].Pos.Sub(&offset))
 			}
 		}
 		return
@@ -56,21 +78,21 @@ func (particle *Particle) findNNRec(root *Cell, offset Vec2) {
 		distLower := Dist(root.Lower.BCenter, pos)
 
 		// sqrt call ...
-		maxDist := math.Sqrt(particle.NNQueuePeekKey())
+		maxDist := math.Sqrt(sim.NNQueuePeekKey(particleIndex))
 
 		if distLower < distUpper {
 			if distLower - root.Lower.BRadius < maxDist {
-				particle.findNNRec(root.Lower, offset)
+				sim.findNNRec(root.Lower, particleIndex, offset)
 			}
 			if distUpper - root.Upper.BRadius < maxDist {
-				particle.findNNRec(root.Upper, offset)
+				sim.findNNRec(root.Upper, particleIndex, offset)
 			}
 		} else {
 			if distUpper - root.Upper.BRadius < maxDist {
-				particle.findNNRec(root.Upper, offset)
+				sim.findNNRec(root.Upper, particleIndex, offset)
 			}
 			if distLower - root.Lower.BRadius < maxDist {
-				particle.findNNRec(root.Lower, offset)
+				sim.findNNRec(root.Lower, particleIndex, offset)
 			}
 
 		}
@@ -78,11 +100,11 @@ func (particle *Particle) findNNRec(root *Cell, offset Vec2) {
 	}
 
 	if root.Upper != nil {
-		particle.findNNRec(root.Upper, offset)
+		sim.findNNRec(root.Upper, particleIndex, offset)
 	}
 
 	if root.Lower != nil {
-		particle.findNNRec(root.Lower, offset)
+		sim.findNNRec(root.Lower, particleIndex, offset)
 	}
 }
 
@@ -99,37 +121,40 @@ func (cell *Cell) DistSquared(to *Vec2) float64 {
 }
 
 
-func (p *Particle) NNQueuePeekKey() float64 {
-	return p.NNDists[0]
+func (sim *Simulation) NNQueuePeekKey(particleIndex int) float64 {
+	return sim.NNDists[particleIndex][0]
 }
 
-func (p *Particle) NNQueueInsert(dist float64, neighbour *Particle, realPos Vec2) {
-	p.NNDists[0] = dist
-	p.NearestNeighbours[0] = neighbour
-	p.NNPos[0] = realPos
-	NNQueueHeapify(p, 0)
+func (sim *Simulation) NNQueueInsert(particleIndex int, dist float64, neighbour *Particle, realPos Vec2) {
+	sim.NNDists[particleIndex][0] = dist
+	sim.NearestNeighbours[particleIndex][0] = neighbour
+	sim.NNPos[particleIndex][0] = realPos
+	sim.NNQueueHeapify(particleIndex, 0)
 }
 
 // TODO(#6): @Speed use memcopy
-func (p *Particle) NNQueueInitSentinel() {
-	for i := range NN_SIZE {
-		p.NNDists[i] = math.MaxFloat64
-		p.NearestNeighbours[i] = nil
-		p.NNPos[i] = Vec2{}
+func (sim *Simulation) NNQueueInitSentinel() {
+	for particleIndex := range sim.Particles{
+		for j := range NN_SIZE {
+			sim.NNDists[particleIndex][j] = math.MaxFloat64
+			sim.NearestNeighbours[particleIndex][j] = nil
+			sim.NNPos[particleIndex][j] = Vec2{}
+		}
 	}
 }
 
-func NNQueueHeapify(p *Particle, i int) {
+
+func (sim *Simulation) NNQueueHeapify(pi int, i int) {
 	for {
 		l := i*2 + 1
 		r := i*2 + 2
 		max_index := i
 
-		if l < NN_SIZE && p.NNDists[max_index] < p.NNDists[l]{
+		if l < NN_SIZE && sim.NNDists[pi][max_index] < sim.NNDists[pi][l]{
 			max_index = l
 		}
 
-		if r < NN_SIZE && p.NNDists[max_index] < p.NNDists[r] {
+		if r < NN_SIZE && sim.NNDists[pi][max_index] < sim.NNDists[pi][r] {
 			max_index = r
 		}
 
@@ -138,9 +163,9 @@ func NNQueueHeapify(p *Particle, i int) {
 		}
 
 		// swap elements
-		p.NNDists[i], p.NNDists[max_index] = p.NNDists[max_index], p.NNDists[i]
-		p.NearestNeighbours[i], p.NearestNeighbours[max_index] = p.NearestNeighbours[max_index], p.NearestNeighbours[i]
-		p.NNPos[i], p.NNPos[max_index] = p.NNPos[max_index], p.NNPos[i]
+		sim.NNDists[pi][i], sim.NNDists[pi][max_index] = sim.NNDists[pi][max_index], sim.NNDists[pi][i]
+		sim.NearestNeighbours[pi][i], sim.NearestNeighbours[pi][max_index] = sim.NearestNeighbours[pi][max_index], sim.NearestNeighbours[pi][i]
+		sim.NNPos[pi][i], sim.NNPos[pi][max_index] = sim.NNPos[pi][max_index], sim.NNPos[pi][i]
 
 		i = max_index
 	}

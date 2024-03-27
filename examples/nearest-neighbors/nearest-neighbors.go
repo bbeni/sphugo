@@ -19,7 +19,17 @@ import (
 )
 
 func NonPeriodic() {
-	root := sim.MakeCellsUniform(220, sim.Vertical)
+
+	// It feels kind of weird to having to make a whole simulation struct to just do this...
+	simul     := sim.Simulation{}
+	simul.Root = sim.MakeCellsUniform(220, sim.Vertical)
+	simul.Particles = simul.Root.Particles[:]
+
+	simul.NearestNeighbours = make([][sim.NN_SIZE]*sim.Particle, len(simul.Particles))
+	simul.NNDists 		    = make([][sim.NN_SIZE]float64, len(simul.Particles))
+	simul.NNPos			    = make([][sim.NN_SIZE]sim.Vec2, len(simul.Particles))
+
+	root := simul.Root
 	root.BoundingSpheres()
 
 	w, h := 1000, 1000
@@ -39,24 +49,38 @@ func NonPeriodic() {
 	x, y := p0.Pos.X*float64(w), p0.Pos.Y*float64(h)
 	canvas.DrawDisk(float32(x), float32(y), 10, gfx.GREEN)
 
+	// Find the nearest neighbors of all particles
+	simul.FindNearestNeighbours()
 
-	// Find the nearest neighbors of the picked particle and plot them
-	p0.FindNearestNeighbours(root)
+	// plot particle number 14 and its neighbours
 	for i := range sim.NN_SIZE {
-		pn := *p0.NearestNeighbours[i]
+		pn := *simul.NearestNeighbours[14][i]
 		x, y := pn.Pos.X*float64(w), pn.Pos.Y*float64(h)
 		canvas.DrawDisk(float32(x), float32(y), 4.4, gfx.GREEN)
 	}
 
 	// Draw green circle
-	radius := float32(p0.NNDists[0]*float64(w))
+	radius := float32(simul.NNDists[14][0]*float64(w))
 	canvas.DrawCircle(float32(x), float32(y), radius, 2, gfx.GREEN)
 
 	canvas.ToPNG("nearest_neighbours.png")
 }
 
 func Periodic() {
-	root := sim.MakeCellsUniform(220, sim.Vertical)
+
+
+
+	// It feels kind of weird to having to make a whole simulation struct to just do this...
+	simul     := sim.Simulation{}
+	simul.Root = sim.MakeCellsUniform(220, sim.Vertical)
+	simul.Particles = simul.Root.Particles[:]
+
+	simul.NearestNeighbours = make([][sim.NN_SIZE]*sim.Particle, len(simul.Particles))
+	simul.NNDists 		    = make([][sim.NN_SIZE]float64, len(simul.Particles))
+	simul.NNPos			    = make([][sim.NN_SIZE]sim.Vec2, len(simul.Particles))
+
+	root := simul.Root
+
 	root.BoundingSpheres()
 
 	w, h := 1000, 1000
@@ -76,18 +100,20 @@ func Periodic() {
 	canvas.DrawDisk(float32(x), float32(y), 10, gfx.GREEN)
 
 
-	// Find the nearest neighbors of the picked particle and plot them
-	p0.FindNearestNeighboursPeriodic(root)
+	simul.FindNearestNeighboursPeriodic()
+
+	// plot particle number 14 and its neighbours
 	for i := range sim.NN_SIZE {
-		pn := *p0.NearestNeighbours[i]
+		pn := *simul.NearestNeighbours[14][i]
 		x, y := pn.Pos.X*float64(w), pn.Pos.Y*float64(h)
 		canvas.DrawDisk(float32(x), float32(y), 4.4, gfx.GREEN)
 	}
 
+
 	// Draw green circles periodic
 	for i := -1.0; i<=1; i++ {
 		for j := -1.0; j<=1; j++ {
-			radius := float32(p0.NNDists[0]*float64(w))
+			radius := float32(simul.NNDists[14][0]*float64(w))
 			pixel_x := float32(x) + float32(float64(w)*i)
 			pixel_y := float32(y) + float32(float64(h)*j)
 			canvas.DrawCircle(pixel_x, pixel_y, radius, 2, gfx.GREEN)

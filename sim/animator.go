@@ -65,7 +65,7 @@ func (ani *Animator) CurrentFrame() gfx.Canvas {
 	canvas := gfx.NewCanvas(1280, 720)
 	canvas.Clear(gfx.BLACK)
 
-	for _, particle := range ani.renderingParticleArray {
+	for pi, particle := range ani.renderingParticleArray {
 		x := float32(particle.Pos.X) * float32(canvas.W)
 		y := float32(particle.Pos.Y) * float32(canvas.H)
 
@@ -85,7 +85,7 @@ func (ani *Animator) CurrentFrame() gfx.Canvas {
 
 
 		if color_index > 255 {
-			nnRadius := float32(particle.NNDists[0])*float32(canvas.W)
+			nnRadius := float32(ani.Simulation.NNDists[pi][0])*float32(canvas.W)
 			canvas.DrawCircle(x, y, nnRadius, 2, gfx.WHITE)
 		}
 

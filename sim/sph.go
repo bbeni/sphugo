@@ -15,7 +15,14 @@ type Simulation struct {
 	Config SphConfig
 
 	Root *Cell // Tree structure for keeping track of spatial cells of particles
+
 	Particles []Particle
+
+	// 32*(8+8)  = 512 bytes per NN
+	NearestNeighbours [][NN_SIZE]*Particle
+	NNDists 		  [][NN_SIZE]float64
+	NNPos			  [][NN_SIZE]Vec2     // keep track of position,  we need to know because of periodic b.c.
+
 	CurrentStep int
 
 	IsBusy  sync.Mutex
@@ -31,6 +38,10 @@ func MakeSimulation() (Simulation){
 	sim.Particles = spawner.Spawn(0)
 	sim.Root = MakeCells(sim.Particles, Vertical)
 
+	sim.NearestNeighbours = make([][NN_SIZE]*Particle, len(sim.Particles))
+	sim.NNDists 		  = make([][NN_SIZE]float64, len(sim.Particles))
+	sim.NNPos			  = make([][NN_SIZE]Vec2, len(sim.Particles))
+
 	return sim
 }
 
@@ -45,7 +56,7 @@ func MakeSimulationFromConf(conf SphConfig) (Simulation){
 		Config: conf,
 	}
 
-	ps := make([]Particle, 0, 100000)
+	ps := make([]Particle, 0, 100000) // prealocate 100000 but its dynamic so it doesn't matter much
 
 	for _, startSpawner := range sim.Config.Start {
 		ps = append(ps, startSpawner.Spawn(0)...)
@@ -54,8 +65,11 @@ func MakeSimulationFromConf(conf SphConfig) (Simulation){
 	sim.Particles = ps
 	sim.Root = MakeCells(sim.Particles, Vertical)
 
-	return sim
+	sim.NearestNeighbours = make([][NN_SIZE]*Particle, len(sim.Particles))
+	sim.NNDists 		  = make([][NN_SIZE]float64, len(sim.Particles))
+	sim.NNPos			  = make([][NN_SIZE]Vec2, len(sim.Particles))
 
+	return sim
 }
 
 
@@ -192,14 +206,14 @@ func (sim *Simulation) Step() {
 
 
 // lets assume mass 1 per particle, so the density is just the 1/volume of sphere
-func DensityTopHat3D(p *Particle) (float64) {
-	maxR := p.NNDists[0]
-	return 3 * NN_SIZE / (4*math.Pi*maxR*maxR*maxR)
-}
+//func DensityTopHat3D(p *Particle) (float64) {
+//	maxR := p.NNDists[0]
+//	return 3 * NN_SIZE / (4*math.Pi*maxR*maxR*maxR)
+//}
 
 
 // lets assume mass 1 per particle, so the density is just the 1/volume of sphere
-func DensityMonahan3D(p *Particle) (float64) {
+/*func DensityMonahan3D(p *Particle) (float64) {
 	maxR := p.NNDists[0]
 
 	acc := 0.0
@@ -221,25 +235,25 @@ func DensityMonahan3D(p *Particle) (float64) {
 	}
 
 	return acc * 6 * 8 / (math.Pi*maxR*maxR*maxR)
-}
+}*/
 
 
 // lets assume mass 1 per particle, so the density is just the 1/volume of sphere
-func DensityTopHat2D(p *Particle) (float64) {
-	maxR := p.NNDists[0]
+func DensityTopHat2D(pi int, sim* Simulation) (float64) {
+	maxR := sim.NNDists[pi][0]
 	return  NN_SIZE / (math.Pi*maxR*maxR)
 }
 
 
-func DensityMonahan2D(p *Particle, sim *Simulation) (float64) {
-	maxR := p.NNDists[0]
+func DensityMonahan2D(pi int, sim *Simulation) (float64) {
+	maxR := sim.NNDists[pi][0]
 
 	acc := 0.0
 	var x float64
 
 	var i int
 	for i = range NN_SIZE {
-		x = p.NNDists[i]/maxR
+		x = sim.NNDists[pi][i]/maxR
 
 		if x > 1 || x < 0 {
 			panic("unreachable")
@@ -258,9 +272,10 @@ func DensityMonahan2D(p *Particle, sim *Simulation) (float64) {
 
 // - Sum [ (Pa/rhoa^2       + Pb/rhob^2     + PIab )]
 //			contribution A  + contributionB
-func AccelerationAndEDotMonahan2D(p *Particle, sim *Simulation) {
+func AccelerationAndEDotMonahan2D(pi int, sim *Simulation) {
 	gamma := sim.Config.Gamma
-	maxR  := p.NNDists[0]
+	maxR  := sim.NNDists[pi][0]
+	p     := &sim.Particles[pi]
 
 	// PA / rhoA^2
 	contributionA := p.C*p.C / (gamma*p.Rho)
@@ -275,8 +290,8 @@ func AccelerationAndEDotMonahan2D(p *Particle, sim *Simulation) {
 	var q float64
 	var i int
 	for i = range NN_SIZE {
-		nn := p.NearestNeighbours[i]
-		q   = p.NNDists[i]/maxR 			// r/h in lecture
+		nn := sim.NearestNeighbours[pi][i]
+		q   = sim.NNDists[pi][i]/maxR 			// r/h in lecture
 
 		if q > 1 || q < 0 {
 			panic("kernel parameter q not in [0, 1]!")
@@ -303,7 +318,7 @@ func AccelerationAndEDotMonahan2D(p *Particle, sim *Simulation) {
 		//vB := nn.Vel
 
 		rA := p.Pos
-		rB := p.NNPos[i]
+		rB := sim.NNPos[pi][i]
 
 		//
 		// Viscosity Term
@@ -321,7 +336,7 @@ func AccelerationAndEDotMonahan2D(p *Particle, sim *Simulation) {
 			)
 			cAB   := 0.5 * (p.C + nn.C)
 			rhoAB := 0.5 * (p.Rho + nn.Rho)
-			hAB   := 0.5 * (p.NNDists[0] + nn.NNDists[0])
+			hAB   := 0.5 * (sim.NNDists[pi][0] + nn.h)
 			muAB  := dot * hAB / (rAB.Dot(&rAB) + etaSq)
 			piAB  = (-alpha*cAB*muAB + beta*muAB*muAB) / rhoAB
 		}
@@ -329,11 +344,11 @@ func AccelerationAndEDotMonahan2D(p *Particle, sim *Simulation) {
 
 
 		if rAB.X > 0.5 || rAB.Y > 0.5 {
-			panic("rX or rY is bigger than expected. more than half boundary")
+			//panic("rX or rY is bigger than expected. more than half boundary")
 		}
 
-		acc_ax += rAB.X * (piAB + contributionA + contributionB) * dRKernel / p.NNDists[i]
-		acc_ay += rAB.Y * (piAB + contributionA + contributionB) * dRKernel / p.NNDists[i]
+		acc_ax += rAB.X * (piAB + contributionA + contributionB) * dRKernel / sim.NNDists[pi][i]
+		acc_ay += rAB.Y * (piAB + contributionA + contributionB) * dRKernel / sim.NNDists[pi][i]
 		acc_edot += dot * dRKernel
 	}
 
@@ -348,15 +363,9 @@ func AccelerationAndEDotMonahan2D(p *Particle, sim *Simulation) {
 
 func (sim *Simulation) CalculateForces() {
 
-	// rebuild the tree to perserve data locality
 	sim.Root.Treebuild(Vertical)
-
 	sim.Root.BoundingSpheres()
-
-	// claculate all nearest neighbours
-	for i, _ := range sim.Root.Particles {
-		sim.Root.Particles[i].FindNearestNeighboursPeriodic(sim.Root)
-	}
+	sim.FindNearestNeighboursPeriodic()
 
 	// Calculate Nearest Neighbor Density Rho
 	{
@@ -364,7 +373,7 @@ func (sim *Simulation) CalculateForces() {
 		for i, _ := range sim.Root.Particles {
 			p := &sim.Root.Particles[i]
 			//p.Rho = DensityTopHat2D(p)
-			p.Rho = DensityMonahan2D(p, sim)
+			p.Rho = DensityMonahan2D(i, sim)
 			//fmt.Println(p.Rho)
 		}
 	}
@@ -386,7 +395,7 @@ func (sim *Simulation) CalculateForces() {
 	{
 		// TODO(#4): implement NN forces
 		for i, _ := range sim.Root.Particles {
-			AccelerationAndEDotMonahan2D(&sim.Root.Particles[i], sim)
+			AccelerationAndEDotMonahan2D(i, sim)
 		}
 	}
 

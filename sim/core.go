@@ -29,14 +29,7 @@ type Particle struct {
 	VPred Vec2    // Predicted Velicty
 	// 96 bytes until now
 
-	// TODO: move this out of particles so we have smaller particle size! -> cache locality
-	// @Speed might be bad because we have a big particle size now
-	// should rather keep it seperate to prevent cache misses?
-	// for now we just naively implement it like this
-	// 32*(8+8)  = 512 bytes
-	NearestNeighbours [NN_SIZE]*Particle
-	NNDists 		  [NN_SIZE]float64
-	NNPos			  [NN_SIZE]Vec2     // keep track of position,  we need to know because of periodic b.c.
+	h	float64
 
 	// visualisation trick for depth rendering
 	Z int
@@ -111,6 +104,7 @@ func MakeCells(particles []Particle, ori Orientation) (*Cell) {
 func MakeCellsUniform(n int, orientation Orientation) (*Cell) {
 
 	particles := make([]Particle, n)
+	InitUniformly(particles)
 	cell := MakeCells(particles, orientation)
 
 	return cell
