@@ -53,7 +53,7 @@ func main() {
 	for i := range 10000 {
 		sph.Step()
 		canvas := animator.CurrentFrame()
-		out_file := fmt.Sprintf("./out/%.4	v.png", i)
+		out_file := fmt.Sprintf("./out/%v.4	v.png", i)
 		canvas.ToPNG(out_file)
 	}
 
