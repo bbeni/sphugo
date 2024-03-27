@@ -101,7 +101,6 @@ func run() {
 		FontFace:		  fontFace,
 	}
 
-
 	w, err := win.New(win.Title("SFUGO - Simulation Renderer"), win.Size(W, H))
 	if err != nil {
 		panic(err)
@@ -114,7 +113,12 @@ func run() {
 		return r
 	}
 
-	simulation := sim.MakeSimulation()
+
+	// create example config file if not existent
+	exampleConfigFilePath := "./example.sph-config"
+	sim.GenerateDefaultConfigFile(exampleConfigFilePath)
+
+	simulation := sim.MakeSimulationFromConfig(exampleConfigFilePath)
 	animator   := sim.MakeAnimator(&simulation)
 
 	// TODO: cleanup this mess, too many channels and/or missleading names!
@@ -598,10 +602,5 @@ func Max(a, b int) int {
 
 
 func main() {
-	fname := "example.sph-config"
-	config := sim.MakeConfig(sim.Tokenize(fname))
-	fmt.Println(config)
-
-	_ = mainthread.Run
-	//mainthread.Run(run)
+	mainthread.Run(run)
 }

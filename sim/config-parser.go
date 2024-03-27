@@ -1,62 +1,98 @@
+/* This is the config parser
+
+TODO: complete and actually implement the functianilty in the simulation
+
+It seems a big bloat for what it is doing. It should not be this big,
+but i just wanted to experiment with parsing files in general and see
+how to implement useful error messages. I hope the error messages help
+to debug config files.
+
+*/
+
 package sim
 
 import (
 	"unicode"
 	"fmt"
 	"os"
+	"math/rand"
+	"time"
 	"strconv"
 )
 
 // For now these Titles and Subtitles are valid
 var validTitleSubtitles = map[string][]string{
-	"Simulation": {"Constants", "Viewports"},
+	"Simulation": {"Constants", "Viewport"},
 	"Start": 	  {"UniformRect"},
 	"Boundaries": {"Periodic", "Reflection"},
 	"Sources": 	  {"Point"},
 }
 
+/* Valid params:
+  // title,        subtitle,     paramName
+	{"Simulation", "Constants",  "NSteps"},
+	{"Simulation", "Constants",  "Gamma"},
+	{"Simulation", "Constants",  "ParticleMass"},
+	{"Simulation", "Constants",  "DeltaTHalf"},
+	{"Simulation", "Constants",  "Acceleration"},
+	{"Simulation", "Viewport",   "UpperLeft"},
+	{"Simulation", "Viewport",   "LowerRight"},
+	{"Start",      "UniformRect","NParticles"},
+	{"Start",      "UniformRect","UpperLeft"},
+	{"Start",      "UniformRect","LowerRight"},
+	{"Boundaries", "Periodic",   "Left"},
+	{"Boundaries", "Periodic",   "Right"},
+	{"Boundaries", "Reflection", "ToOrigin"},
+	{"Boundaries", "Reflection", "FromOrigin"},
+	{"Sources",    "Point",      "Pos"},
+	{"Sources",    "Point",      "Rate"},
+} */
 
 
-type Param struct {
-	Title	 string
-	Subtitle string
-	Name	 string
+
+type ParticleSource interface {
+	Spawn(t float64) []Particle
 }
 
-
-type dType int
-const (
-	floatT dType = iota
-	intT
-	vec2T
-)
-
-
-// TODO: we are not chcking if we have all for certain needed params
-//  maybe just use default values? or list needed ones per subtitle
-var paramMap = map[Param]dType {
-	{"Simulation", "Constants", "NSteps"}: intT,
-	{"Simulation", "Constants", "Gamma"}: floatT,
-	{"Simulation", "Constants", "ParticleMass"}: floatT,
-	{"Simulation", "Constants", "DeltaTHalf"}: floatT,
-	{"Simulation", "Constants", "Acceleration"}: vec2T,
-	{"Simulation", "Viewport", "UpperLeft"}: vec2T,
-	{"Simulation", "Viewport", "LowerRight"}: vec2T,
-	{"Start", "UniformRect", "NParticles"}: intT,
-	{"Start", "UniformRect", "UpperLeft"}: vec2T,
-	{"Start", "UniformRect", "LowerRight"}: vec2T,
-	{"Boundaries", "Periodic", "Left"}: floatT,
-	{"Boundaries", "Periodic", "Right"}: floatT,
-	{"Boundaries", "Reflection", "ToOrigin"}: vec2T,
-	{"Boundaries", "Reflection", "FromOrigin"}: vec2T,
-	{"Source", "Point", "Pos"}: vec2T,
-	{"Source", "Point", "Rate"}: floatT,
+type UniformRectSpawner struct {
+	UpperLeft  Vec2
+	LowerRight Vec2
+	NParticles int
 }
 
-
-type Source interface {
-	Spawn(time float64) []Particle
+// sensible defaults
+func MakeUniformRectSpawner() UniformRectSpawner{
+	return UniformRectSpawner{
+		LowerRight: Vec2{1, 1},
+		NParticles: 1000,
+	}
 }
+
+// spawn onece uniformely in this rect
+func (spwn UniformRectSpawner) Spawn(t float64) []Particle {
+
+	if USE_RANDOM_SEED {
+		rand.Seed(time.Now().UnixNano())
+	} else {
+	    rand.Seed(12345678)
+	}
+
+ 	particles := make([]Particle, spwn.NParticles)
+
+	for i := range spwn.NParticles {
+		x := spwn.UpperLeft.X + rand.Float64() * (spwn.LowerRight.X - spwn.UpperLeft.X)
+		y := spwn.UpperLeft.Y + rand.Float64() * (spwn.LowerRight.Y - spwn.UpperLeft.Y)
+		particles[i].Pos = Vec2{x, y}
+	}
+
+	for i := range spwn.NParticles {
+		particles[i].Z = rand.Int()
+		particles[i].E = 0.01
+	}
+
+	return particles
+}
+
 
 type Boundary struct {
 	Offset	   Vec2
@@ -77,27 +113,45 @@ type SphConfig struct {
 
 	Boundaries  	[]Boundary
 	Reflections	    []Reflection
-	Sources 		[]Source
-	Start			[]Source // ignores time
+	Sources 		[]ParticleSource
+	Start			[]ParticleSource
 
 	Viewport		[2]Vec2  // upperleft and lower right
 }
 
 
-func MakeConfig(tokens []Token) SphConfig{
-
-	config := SphConfig{
-		// default values are zero or nil except:
+// default values conifg all valuues are zero or empty arrays except defined in this function:
+func MakeConfig() SphConfig {
+	return SphConfig{
 		Gamma:		  1.66666,
 		NSteps:		  10000,
 		DeltaTHalf:	  0.001,
 		ParticleMass: 1,
 		Viewport:  	  [2]Vec2{Vec2{0, 0}, Vec2{1, 1}},
 	}
+}
 
+func MakeConfigFromFile(configFilePath string) SphConfig {
+	tokens := Tokenize(configFilePath)
+	config := MakeConfig()
+	config.updateFromTokens(tokens)
+	return config
+}
+
+
+type Param struct {
+	Title	 string
+	Subtitle string
+	Name	 string
+}
+
+// This function generates a configuration given a tokenized config file
+func (config *SphConfig) updateFromTokens(tokens []Token) {
+
+	var token Token
 	for len(tokens) > 0 {
-		token := tokens[0]
-		tokens := tokens[1:]
+		token, tokens = tokens[0], tokens[1:]
+
 		if token.Type != title {
 			ConfigMakeError(token, fmt.Sprintf("Expected a [[Title]] but got `%v`", token.Type))
 		}
@@ -118,32 +172,43 @@ func MakeConfig(tokens []Token) SphConfig{
 		}
 
 		subtitleStr := token.AsStr
-		if inSlice(validSubtitles, subtitleStr) {
-			ConfigMakeError(token, fmt.Sprintf("`%v` is not a valid subtitle under title: `%v`", subtitleStr, titleStr))
+		if !inSlice(validSubtitles, subtitleStr) {
+			ConfigMakeError(token, fmt.Sprintf("`%v` is not a valid subtitle under title: `%v`. It's valid subtitles are: %v", subtitleStr, titleStr, validSubtitles))
 		}
 
 		if len(tokens) == 0 {
 			break
 		}
 
-		// Here we know we are in the variable definitions
 		for len(tokens) > 0 {
-			token = tokens[0]
-			tokens = tokens[1:]
-			if !(token.Type == integer || token.Type == float || token.Type == vec2) {
-				ConfigMakeError(token, fmt.Sprintf("Expected either an int, float or Vec2, but got `%v`", token.Type))
+
+			if tokens[0].Type == title {
+				break
 			}
 
-			p := Param{titleStr, subtitleStr, token.AsStr}
-			_, ok := paramMap[p]
-			if !ok {
-				ConfigMakeError(token, fmt.Sprintf("`%v` is not a valid parameter in `[[%v]]` - `[%v]`", token.AsStr, titleStr, subtitleStr ))
+			token, tokens = tokens[0], tokens[1:]
+
+			if token.Type == subtitle {
+				subtitleStr = token.AsStr
+
+				if !inSlice(validSubtitles, subtitleStr) {
+					ConfigMakeError(token, fmt.Sprintf("`%v` is not a valid subtitle under title: `%v`. It's valid subtitles incude: %v", subtitleStr, titleStr, validSubtitles))
+				}
+				continue
 			}
 
 
+
+			// Here we know we should be in the variable definitions
+			// this should never happen?
+			if token.Type != integer && token.Type != float && token.Type != vec2 {
+				ConfigMakeError(token, fmt.Sprintf("Expected either an int, float or Vec2 parameter definition, but got `%v`", token.Type))
+			}
+
+			p := Param{titleStr, subtitleStr, token.Name}
 
 			// TODO: check if values are set more than once
-			switch p{
+			switch p {
 			case Param{"Simulation", "Constants", "NSteps"}:
 				 config.NSteps = checkInt(token, p)
 			case Param{"Simulation", "Constants", "Gamma"}:
@@ -159,11 +224,52 @@ func MakeConfig(tokens []Token) SphConfig{
 			case Param{"Simulation", "Viewport", "LowerRight"}:
 					 config.Viewport[1] = checkVec2(token, p)
 
-			case Param{"Start", "UniformRect", "NParticles"}:
-				 panic("TOOD: implement [UniformRect]")
-			case Param{"Start", "UniformRect", "UpperLeft"},
+			case Param{"Start", "UniformRect", "NParticles"},
+			     Param{"Start", "UniformRect", "UpperLeft"},
 				 Param{"Start", "UniformRect", "LowerRight"}:
-				 panic("TOOD: implement [UniformRect]")
+
+				// Expect exactly these 3 Params
+				if len(tokens) < 2 {
+					ConfigMakeError(token, fmt.Sprintf("Expected 3 Params following [`%v`] but got something else or nothing.\n\tOne of each paramas `NParticles, UpperLeft, LowerRight` must be defined", subtitleStr, ))
+				}
+
+				startSpawner := UniformRectSpawner{}
+				got := make([]string, 3)
+
+				for i := range 3 {
+
+					if inSlice(got, token.Name) {
+						ConfigMakeError(token, fmt.Sprintf("The parameter name `%v` in [`%v`] is already set!", token.Name, subtitleStr))
+					}
+
+					if token.Type != integer && token.Type != vec2 {
+						ConfigMakeError(token, fmt.Sprintf("Expected either an integer or vec2 parameter definition in [`%v`], but got `%v`", subtitleStr, token.Type))
+					}
+
+					switch token.Name {
+						case "NParticles":
+							startSpawner.NParticles = checkInt(token, p)
+						case "UpperLeft":
+							startSpawner.UpperLeft = checkVec2(token, p)
+						case "LowerRight":
+							startSpawner.LowerRight = checkVec2(token, p)
+						default:
+							ConfigMakeError(token, fmt.Sprintf("The parameter name `%v` in [`%v`] is not valid. Needs to be one of `NParticles, UpperLeft, LowerRight`", token.Name, subtitleStr))
+					}
+
+					got = append(got, p.Name)
+
+					if i==2 {
+						break
+					}
+					token, tokens = tokens[0], tokens[1:]
+				}
+
+				if tokens[0].Type != title && tokens[0].Type != subtitle {
+					ConfigMakeError(token, fmt.Sprintf("The 4th parameter name `%v` in [`%v`] is too much. need to have `NParticles, UpperLeft and LowerRight`", token.Name, subtitleStr))
+				}
+
+				config.Start = append(config.Start, startSpawner)
 
 
 			case Param{"Boundaries", "Periodic", "Left"}:
@@ -196,18 +302,15 @@ func MakeConfig(tokens []Token) SphConfig{
 				 config.Reflections = append(config.Reflections,
 				 	Reflection{Offset: x, FromOrigin: true,})
 
-			case Param{"Source", "Point", "Pos"}:
+			case Param{"Sources", "Point", "Pos"}:
 				 panic("TOOD: implement [Point]")
-			case Param{"Source", "Point", "Rate"}:
+			case Param{"Sources", "Point", "Rate"}:
 				 panic("TOOD: implement [Point]")
 			default:
-				panic("exhaustive check..")
+				ConfigMakeError(token, fmt.Sprintf("`%v` is not a valid parameter in `[[%v]]` - `[%v]`", token.Name, titleStr, subtitleStr ))
 			}
 		}
 	}
-
-	return config
-
 }
 
 func checkInt(t Token, p Param) int {
@@ -239,8 +342,7 @@ func ConfigMakeError(token Token, msg string) {
 	os.Exit(1)
 }
 
-
-
+//go:generate stringer -type TokenType
 type TokenType int
 const (
 	title TokenType = iota
@@ -249,7 +351,6 @@ const (
 	float
 	vec2
 )
-
 
 type Token struct {
 	Type    TokenType
@@ -280,7 +381,11 @@ func Tokenize(fname string) []Token {
 			t.chop(1)
 			t.expect('/')
 			t.chop(1)
-			t.chopUntilIs(aNewline, "expected a newline")
+			t.chopUntilIsNoFail(aNewline)
+			if len(t.text) == 0 {
+				// we are finished
+				break
+			}
 		} else if t.isExactly('[') {
 			t.chop(1)
 
@@ -396,8 +501,6 @@ func Tokenize(fname string) []Token {
 
 	return tokens
 }
-
-
 
 
 func check(err error) {
@@ -581,4 +684,70 @@ func inSlice(list []string, a string) bool {
         }
     }
     return false
+}
+
+func GenerateDefaultConfigFile(filePath string) {
+
+	var exampleConfigSource = `//  Config file for SPHUGO SPH Simulation
+//  This is an example configuration.
+//  <- This is a line comment (only allowed at start of line)
+//
+//	[[Boundaries]]
+//  [[Sources]]
+//  are not implemented as of now !!
+//
+
+[[Simulation]]
+[Constants]
+NSteps              1000
+Gamma               1.666
+ParticleMass        1
+// A 2-D Vector just has 2 components separated by space(s)
+Acceleration        0       1.5
+DeltaTHalf          0.004
+
+// Coordinates of viewport for animation
+[Viewport]
+UpperLeft           0       0
+LowerRight          1       1
+
+// Initial configuration
+[[Start]]
+[UniformRect]
+NParticles          2500
+UpperLeft           0.1     0.3
+LowerRight          0.6     0.7
+
+// Per default boundaries are open
+[[Boundaries]]
+[Periodic]
+Left                0
+Right               1
+
+// A reflection reflects particles without losing momentum
+[Reflection]
+// A refelection line orthognal to origin that refelcts towards origin
+// ToOrigin         0       0.9
+// A reflection boundary taht excludes origin (top-left corner)
+// FromOrigin       0.2     0.2
+
+[[Sources]]
+[Point]
+//Pos                 0.2     0.2
+//Rate                100`
+
+
+	if _, err := os.Stat("./example.sph-config"); err != nil {
+	    if os.IsNotExist(err) {
+
+			file, err := os.Create(filePath)
+			if err != nil {
+				fmt.Printf("Error: couldn't create file %q : %q", filePath, err)
+				os.Exit(1)
+			}
+			defer file.Close()
+
+			file.WriteString(exampleConfigSource)
+	    }
+	}
 }

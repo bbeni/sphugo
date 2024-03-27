@@ -3,8 +3,7 @@ package sim
 import (
 	"math"
 	"log"
-	"time"
- 	"math/rand"
+	//"time"
     "fmt"
 )
 
@@ -12,126 +11,60 @@ var _ = fmt.Print
 
 type Simulation struct {
 
-	// Per timestep values, change the course of the simulation
+	Config SphConfig
+
 	Root *Cell // Tree structure for keeping track of spatial cells of particles
 	Particles []Particle
 	CurrentStep int
-
-	// Constants
-	Gamma float64 // heat capacity ratio = 1+2/f
-	DeltaTHalf float64
-	NSteps int
-	ConstAcc Vec2
-	ParticleMass float64
 }
 
 
 // TODO(#1): Make it more customizable
 func MakeSimulation() (Simulation){
 
-	var sim Simulation
+	sim := Simulation {
+		Config: MakeConfig(),
+	}
 
-	sim.Gamma = 2 //1.6666
-	sim.NSteps = 10000
-	sim.DeltaTHalf = 0.003
-	sim.ConstAcc = Vec2{1.2, 1.2}
-	sim.ParticleMass = 0.5
-
-	nParticles := 1000
-	particles := make([]Particle, nParticles)
-	//InitSpecial(particles)
-	//InitEvenly(particles)
-	//InitEvenlyVelGradient(particles)
-	InitBlock(particles)
-
-	sim.Particles = particles
-	sim.Root = MakeCells(particles, Vertical)
+	spawner := MakeUniformRectSpawner()
+	sim.Particles = spawner.Spawn(0)
+	sim.Root = MakeCells(sim.Particles, Vertical)
 
 	return sim
 }
 
-func InitSpecial(particles []Particle) {
 
-	if USE_RANDOM_SEED {
-		rand.Seed(time.Now().UnixNano())
-	} else {
-	    rand.Seed(12345678)
+func MakeSimulationFromConfig(configFilePath string) (Simulation) {
+
+	sim := Simulation {
+		Config: MakeConfigFromFile(configFilePath),
 	}
 
-	for i, _ := range particles {
-		particles[i].Pos = Vec2{rand.Float64(), rand.Float64()}
+	ps := make([]Particle, 0, 10000)
+
+	for _, startSpawner := range sim.Config.Start {
+		ps = append(ps, startSpawner.Spawn(0)...)
 	}
 
-	for i, _ := range particles {
-		particles[i].Z   = rand.Int()
-		zNormalized := float64(particles[i].Z)/float64(math.MaxInt)
-		particles[i].Vel = Vec2{rand.Float64()*0.02, -rand.Float64()*0.15}.Mul(1/zNormalized)
-	}
+	sim.Particles = ps
+	sim.Root = MakeCells(sim.Particles, Vertical)
+
+	return sim
+
 }
-
-
-func InitEvenlyVelGradient(particles []Particle) {
-	if USE_RANDOM_SEED {
-		rand.Seed(time.Now().UnixNano())
-	} else {
-	    rand.Seed(12345678)
-	}
-
-	for i, _ := range particles {
-		particles[i].Pos = Vec2{rand.Float64(), rand.Float64()}
-	}
-	for i, _ := range particles {
-		particles[i].Z   = rand.Int()
-		particles[i].Vel = Vec2{0.05 + particles[i].Pos.X * 0.1, (rand.Float64() - 0.5)*0.1}
-	}
-}
-
-
-func InitEvenly(particles []Particle) {
-	if USE_RANDOM_SEED {
-		rand.Seed(time.Now().UnixNano())
-	} else {
-	    rand.Seed(12345678)
-	}
-
-	for i, _ := range particles {
-		particles[i].Pos = Vec2{rand.Float64(), rand.Float64()}
-	}
-	for i, _ := range particles {
-		particles[i].Z = rand.Int()
-		particles[i].E = 0.01
-	}
-}
-
-func InitBlock(particles []Particle) {
-	if USE_RANDOM_SEED {
-		rand.Seed(time.Now().UnixNano())
-	} else {
-	    rand.Seed(12345678)
-	}
-
-	for i, _ := range particles {
-		particles[i].Pos = Vec2{rand.Float64()*4/6, rand.Float64()*4/5}
-	}
-	for i, _ := range particles {
-		particles[i].Z = rand.Int()
-		particles[i].E = 0.01
-	}
-}
-
-
-
 
 func (sim *Simulation) Run() {
-	for step := range sim.NSteps {
+	for step := range sim.Config.NSteps {
 		sim.Step()
-		log.Printf("Calculated step %v/%v", step, sim.NSteps)
+		log.Printf("Calculated step %v/%v", step, sim.Config.NSteps)
 	}
 }
-
 
 // SPH
 func (sim *Simulation) Step() {
+
+	// constants
+	dtHalf := sim.Config.DeltaTHalf
 
 	// step 0 of SPH needs special work done before real step is done
 	if sim.CurrentStep == 0 {
@@ -156,12 +89,12 @@ func (sim *Simulation) Step() {
 		for i, _ := range sim.Root.Particles {
 			p      := &sim.Root.Particles[i]
 
-			vdt    := p.Vel.Mul(sim.DeltaTHalf)
+			vdt    := p.Vel.Mul(dtHalf)
 			p.Pos   = p.Pos.Add(&vdt)
 
-			adt    := p.VDot.Mul(sim.DeltaTHalf)
+			adt    := p.VDot.Mul(dtHalf)
 			p.VPred = p.Vel.Add(&adt)
-			p.EPred = p.E + p.EDot * sim.DeltaTHalf
+			p.EPred = p.E + p.EDot * dtHalf
 		}
 
 		sim.CalculateForces()
@@ -169,16 +102,16 @@ func (sim *Simulation) Step() {
 		// kick dt
 		for i, _ := range sim.Root.Particles {
 			p := &sim.Root.Particles[i]
-			adt  := p.VDot.Mul(2*sim.DeltaTHalf)
+			adt  := p.VDot.Mul(2*dtHalf)
 			p.Vel = p.Vel.Add(&adt)
-			p.E   = p.E + p.EDot*2*sim.DeltaTHalf
+			p.E   = p.E + p.EDot*2*dtHalf
 		}
 
 		// drift 2 for leapfrog dt/2
 		for i, _ := range sim.Root.Particles {
 			p := &sim.Root.Particles[i]
 
-			vdt    := p.Vel.Mul(sim.DeltaTHalf)
+			vdt    := p.Vel.Mul(dtHalf)
 			p.Pos   = p.Pos.Add(&vdt)
 		}
 
@@ -309,17 +242,18 @@ func DensityMonahan2D(p *Particle, sim *Simulation) (float64) {
 		acc += (1 - x)*(1 - x)*(1 - x) / 3
 	}
 
-	return sim.ParticleMass*acc*6*40/(math.Pi*maxR*maxR*7)
+	return sim.Config.ParticleMass*acc*6*40/(math.Pi*maxR*maxR*7)
 }
 
 
 // - Sum [ (Pa/rhoa^2       + Pb/rhob^2     + PIab )]
 //			contribution A  + contributionB
 func AccelerationAndEDotMonahan2D(p *Particle, sim *Simulation) {
-	maxR := p.NNDists[0]
+	gamma := sim.Config.Gamma
+	maxR  := p.NNDists[0]
 
 	// PA / rhoA^2
-	contributionA := p.C*p.C / (sim.Gamma*p.Rho)
+	contributionA := p.C*p.C / (gamma*p.Rho)
 	contributionB := 0.0
 
 	dRKernel := 0.0
@@ -350,7 +284,7 @@ func AccelerationAndEDotMonahan2D(p *Particle, sim *Simulation) {
 		}
 
 		// PB / rhoB^2
-		contributionB = nn.C*nn.C / (sim.Gamma*nn.Rho)
+		contributionB = nn.C*nn.C / (gamma*nn.Rho)
 
 
 		vA := p.VPred
@@ -376,7 +310,7 @@ func AccelerationAndEDotMonahan2D(p *Particle, sim *Simulation) {
 				etaSq = 0.01
 			)
 			cAB   := 0.5 * (p.C + nn.C)
-			rhoAB := 0.5 * (p.Rho + p.Rho)
+			rhoAB := 0.5 * (p.Rho + nn.Rho)
 			hAB   := 0.5 * (p.NNDists[0] + nn.NNDists[0])
 			muAB  := dot * hAB / (rAB.Dot(&rAB) + etaSq)
 			piAB  = (-alpha*cAB*muAB + beta*muAB*muAB) / rhoAB
@@ -394,10 +328,10 @@ func AccelerationAndEDotMonahan2D(p *Particle, sim *Simulation) {
 	}
 
 	acc := Vec2{acc_ax, acc_ay}
-    acc = acc.Mul(6*40*sim.ParticleMass/(math.Pi*maxR*maxR*maxR*7))
-    acc = acc.Add(&sim.ConstAcc)
+    acc = acc.Mul(6 * 40 * sim.Config.ParticleMass / (7 * math.Pi * maxR*maxR*maxR))
+    acc = acc.Add(&sim.Config.Acceleration)
 	p.VDot = acc
-	p.EDot = contributionA * acc_edot * sim.ParticleMass // Benz formulation
+	p.EDot = contributionA * acc_edot * sim.Config.ParticleMass // Benz formulation
 }
 
 
@@ -430,7 +364,7 @@ func (sim *Simulation) CalculateForces() {
 	// c = sqrt(gamma(gamma-1)ePred)
 	// gamma heat capacity ratio = 1 + 2/f
 	{
-		factor := sim.Gamma * (sim.Gamma - 1)
+		factor := sim.Config.Gamma * (sim.Config.Gamma - 1)
 		for i, _ := range sim.Root.Particles {
 			c := math.Sqrt(factor * sim.Root.Particles[i].EPred)
 			sim.Root.Particles[i].C = c

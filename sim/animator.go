@@ -44,7 +44,7 @@ func MakeAnimator(simulation *Simulation) Animator {
 	}
 
 	ani.Simulation = simulation
-	ani.Frames = make([]image.Image, 0, simulation.NSteps)
+	ani.Frames = make([]image.Image, 0, simulation.Config.NSteps)
 
 	ani.ActiveFrame = -1
 
@@ -75,7 +75,7 @@ func (ani *Animator) CurrentFrame() gfx.Canvas {
 		//color_index := 255 - uint8((particle.Rho - 1)*64)
 		//color_index := 255 - uint8(zNormalized * 256)
 
-		m := ani.Simulation.ParticleMass
+		m := ani.Simulation.Config.ParticleMass
 		colorFormula := float64(particle.Rho/(m* float64(len(ani.Simulation.Particles)*10))*256)
 		//colorFormula := float64(particle.Vel.Norm()*256)
 
