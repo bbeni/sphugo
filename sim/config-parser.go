@@ -686,9 +686,57 @@ func inSlice(list []string, a string) bool {
     return false
 }
 
-func GenerateDefaultConfigFile(filePath string) {
 
-	var exampleConfigSource = `//  Config file for SPHUGO SPH Simulation
+func GenerateDefaultConfigFile(filePath string) {
+	// TODO: this looks cursed...
+	// and it generates 2 example files instead of one
+
+
+var exampleConfigSource1 = `[[Simulation]]
+[Constants]
+NSteps              1000
+Gamma               1.666
+ParticleMass        1
+// A 2-D Vector just has 2 components separated by space(s)
+Acceleration        0       0.5
+DeltaTHalf          0.001
+
+// Coordinates of viewport for animation
+[Viewport]
+UpperLeft           0       0
+LowerRight          1       1
+
+// Initial configuration
+[[Start]]
+[UniformRect]
+NParticles          2500
+UpperLeft           0.6     0.1
+LowerRight          0.95    0.4
+[UniformRect]
+NParticles          1000
+UpperLeft           0.1     0.1
+LowerRight          0.4     0.5
+
+// Per default boundaries are open
+[[Boundaries]]
+[Periodic]
+Left                0
+Right               1
+
+// A reflection reflects particles without losing momentum
+[Reflection]
+// A refelection line orthognal to origin that refelcts towards origin
+// ToOrigin         0       0.9
+// A reflection boundary taht excludes origin (top-left corner)
+// FromOrigin       0.2     0.2
+
+[[Sources]]
+[Point]
+//Pos                 0.2     0.2
+//Rate                100`
+
+
+var exampleConfigSource2 = `//  Config file for SPHUGO SPH Simulation
 //  This is an example configuration.
 //  <- This is a line comment (only allowed at start of line)
 //
@@ -715,8 +763,12 @@ LowerRight          1       1
 [[Start]]
 [UniformRect]
 NParticles          2500
-UpperLeft           0.1     0.3
-LowerRight          0.6     0.7
+UpperLeft           0.6     0.1
+LowerRight          0.9     0.4
+[UniformRect]
+NParticles          1000
+UpperLeft           0.1     0.1
+LowerRight          0.4     0.4
 
 // Per default boundaries are open
 [[Boundaries]]
@@ -736,10 +788,16 @@ Right               1
 //Pos                 0.2     0.2
 //Rate                100`
 
+	// TODO: change hardcoded
+	_ = filePath
 
-	if _, err := os.Stat("./example.sph-config"); err != nil {
+	GenerateTextFile("./example2.sph-config", exampleConfigSource1)
+	GenerateTextFile("./example.sph-config", exampleConfigSource2)
+}
+
+func GenerateTextFile(filePath string, source string) {
+	if _, err := os.Stat(filePath); err != nil {
 	    if os.IsNotExist(err) {
-
 			file, err := os.Create(filePath)
 			if err != nil {
 				fmt.Printf("Error: couldn't create file %q : %q", filePath, err)
@@ -747,7 +805,7 @@ Right               1
 			}
 			defer file.Close()
 
-			file.WriteString(exampleConfigSource)
+			file.WriteString(source)
 	    }
 	}
 }

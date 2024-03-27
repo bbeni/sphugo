@@ -4,6 +4,7 @@ import (
 	"image"
 	"math"
 	"log"
+	"fmt"
 	"os"
 	"image/png"
 
@@ -24,9 +25,6 @@ type Animator struct {
 	// reference to particles
 	// also used to order particles acoording to z-value before rendering
 	renderingParticleArray []*Particle
-
-	// TODO: Gui state, should be moved to simviewer.go!
-	ActiveFrame int
 }
 
 func MakeAnimator(simulation *Simulation) Animator {
@@ -46,8 +44,8 @@ func MakeAnimator(simulation *Simulation) Animator {
 	ani.Simulation = simulation
 	ani.Frames = make([]image.Image, 0, simulation.Config.NSteps)
 
-	ani.ActiveFrame = -1
-
+	// render first frame
+	ani.Frame()
 	return ani
 }
 
@@ -97,40 +95,28 @@ func (ani *Animator) CurrentFrame() gfx.Canvas {
 	return canvas
 }
 
-
 // save the last frame of the simultion in the buffer
 func (ani *Animator) Frame() {
-
 	canvas := ani.CurrentFrame()
-
-	//ani.FramesMu.Lock()
 	ani.Frames = append(ani.Frames, canvas.Img)
-	//ani.FramesMu.Unlock()
 }
 
+func (ani *Animator) FrameToPNG(file_path string, i int) bool {
 
-
-
-func (ani *Animator) FrameToPNG(file_path string) bool {
-	if ani.ActiveFrame == -1 {
-		log.Printf("Error: No frame to render, because no Frames in Animator!")
-		return false
-	}
-
-	i := ani.ActiveFrame
+	// TODO: check i for bounds
 
 	file, err := os.Create(file_path)
 	defer file.Close()
 
 	if err != nil {
-		log.Fatalf("Error: couldn't create file %q : %q", file_path, err)
-		os.Exit(1)
+		fmt.Printf("Error: couldn't create file %q : %q", file_path, err)
+		return false
 	}
 
 	err = png.Encode(file, ani.Frames[i])
 	if err != nil {
-		log.Fatalf("Error: couldn't encode PNG %q : %q", file_path, err)
-		os.Exit(1)
+		log.Printf("Error: couldn't encode PNG %q : %q", file_path, err)
+		return false
 	}
 
 	return true

@@ -5,6 +5,7 @@ import (
 	"log"
 	//"time"
     "fmt"
+    "sync"
 )
 
 var _ = fmt.Print
@@ -16,6 +17,8 @@ type Simulation struct {
 	Root *Cell // Tree structure for keeping track of spatial cells of particles
 	Particles []Particle
 	CurrentStep int
+
+	IsBusy  sync.Mutex
 }
 
 
@@ -62,6 +65,8 @@ func (sim *Simulation) Run() {
 
 // SPH
 func (sim *Simulation) Step() {
+
+	sim.IsBusy.Lock()
 
 	// constants
 	dtHalf := sim.Config.DeltaTHalf
@@ -178,6 +183,7 @@ func (sim *Simulation) Step() {
 	}
 
 	sim.CurrentStep += 1
+	sim.IsBusy.Unlock()
 }
 
 

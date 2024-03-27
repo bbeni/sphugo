@@ -9,6 +9,8 @@ import (
 	"sync"
 	"fmt"
 	"log"
+	"os"
+	"strings"
 
 	"github.com/faiface/gui"
 	"github.com/faiface/gui/win"
@@ -25,6 +27,7 @@ import (
 
 // TODO: remove later
 var _ = fmt.Println
+var _ = log.Print
 
 const (
 	PANEL_W    = 330
@@ -32,13 +35,16 @@ const (
 	RENDERER_H = 720
 
 	TEXT_SIZE  = 24
-	BTN_H 	   = 70
+	BTN_H 	   = 64
 	MARGIN_BOT = 4
+
+	OPTION_H   = 64
+	OPTION_PAD = 4
 
 	SEEKER_H   = 24
 	SEEKER_W   = 36
 	SEEKER_MIN_W = 8
-	SEEKER_FRAME_MARGIN = 4
+	SEEKER_PAD = 4
 
 	BOT_PANEL_H = 220
 )
@@ -50,6 +56,10 @@ type Theme struct {
 	ButtonUp	   color.RGBA
 	ButtonHover	   color.RGBA
 	ButtonBlink    color.RGBA
+
+	OptionText	   color.RGBA
+	OptionUp	   color.RGBA
+	OptionHover   color.RGBA
 
 	SeekerBackground color.RGBA
 	SeekerFrame		 color.RGBA
@@ -90,6 +100,11 @@ func run() {
 		ButtonHover:	 	color.RGBA{45,   45,  45, 255},
 		ButtonBlink:	 	color.RGBA{70,   70,  70, 255},
 
+
+		OptionText: 	    color.RGBA{36,   33,  36, 255}, // Raisin Black
+		OptionUp:    		color.RGBA{255, 250, 240, 255}, // Floral White
+		OptionHover:	 	color.RGBA{240, 220, 200, 255},
+
 		SeekerFrame:	 	color.RGBA{140,   0,   0, 255},
 		SeekerBackground:	color.RGBA{120,   0,  30, 255},
 		SeekerCursor:	 	color.RGBA{220,  20,  50, 255},
@@ -129,9 +144,36 @@ func run() {
 	seekerChanged1   := make(chan int)
 	seekerChanged2   := make(chan int)
 	energyProfiler   := make(chan float64)
+	energyProfilerReset := make(chan bool)
+	drawOnce		 := make(chan bool)
 
 	mux, env := gui.NewMux(w)
 
+
+	// Background processes
+	{
+		go Simulator(mux.MakeEnv(),
+			simulationToggle,
+			framesChanged, energyProfiler, energyProfilerReset,
+			&simulation, &animator)
+
+		go Renderer(mux.MakeEnv(),
+			animationToggle, seekerChanged1, drawOnce,
+			cursorChanged, seekerChanged2,
+			image.Rect(0, 0, RENDERER_W, RENDERER_H), &animator)
+
+		go Seeker(mux.MakeEnv(),
+			framesChanged, cursorChanged,
+			seekerChanged1, seekerChanged2,
+			image.Rect(0, RENDERER_H, RENDERER_W, RENDERER_H+SEEKER_H), colorTheme)
+
+		go DataViewer(mux.MakeEnv(),
+			framesChanged, seekerChanged2, energyProfiler, energyProfilerReset,
+			image.Rect(0, RENDERER_H + SEEKER_H, RENDERER_W, RENDERER_H+SEEKER_H+BOT_PANEL_H), colorTheme, &simulation)
+
+	}
+
+	// Gui Elements
 	{
 		xa := W - PANEL_W
 		xb := W
@@ -145,51 +187,40 @@ func run() {
 			&fontMu, func() {
 				animationToggle <- true
 		})
-		go Button(mux.MakeEnv(), "Load Configuration", colorTheme,
+		go Button(mux.MakeEnv(), "Render to .mp4", colorTheme,
 			image.Rect(xa, 2*(BTN_H+MARGIN_BOT), xb, 2*(BTN_H+MARGIN_BOT)+BTN_H),
 			&fontMu, func() {
 
 		})
-		go Button(mux.MakeEnv(), "Render to .mp4", colorTheme,
+		go Button(mux.MakeEnv(), "Current Frame to .png", colorTheme,
 			image.Rect(xa, 3*(BTN_H+MARGIN_BOT), xb, 3*(BTN_H+MARGIN_BOT)+BTN_H),
 			&fontMu, func() {
-
-		})
-		go Button(mux.MakeEnv(), "Current Frame to .png", colorTheme,
-			image.Rect(xa, 4*(BTN_H+MARGIN_BOT), xb, 4*(BTN_H+MARGIN_BOT)+BTN_H),
-			&fontMu, func() {
+				// TODO: fix code
+				/*
 				i := animator.ActiveFrame
 				file_path := fmt.Sprintf("frame%v.png", i)
 				animator.FrameToPNG(file_path)
 				log.Printf("Created PNG %s.", file_path)
+				*/
+		})
+
+		go Button(mux.MakeEnv(), "Load Configuration", colorTheme,
+			image.Rect(xa, 4*(BTN_H+MARGIN_BOT), xb, 4*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu,
+			func() {
+				// TODO: fix bug crash when runnning simulation and at the clicking here
+				go ConfigChoser(mux.MakeEnv(), "./", image.Rect(xa, 5*(BTN_H+MARGIN_BOT), xb, H), colorTheme, &fontMu,
+					func(configPath string) {
+						simulation = sim.MakeSimulationFromConfig(configPath)
+						animator   = sim.MakeAnimator(&simulation)
+						drawOnce <- true
+						energyProfilerReset <- true
+						framesChanged <- 1
+						seekerChanged1 <- 0
+
+				})
 		})
 	}
 
-	{
-		go Simulator(mux.MakeEnv(),
-			simulationToggle,
-			framesChanged, energyProfiler,
-			&simulation, &animator)
-
-		go Renderer(mux.MakeEnv(),
-			animationToggle, seekerChanged1,
-			cursorChanged, seekerChanged2,
-			image.Rect(0, 0, RENDERER_W, RENDERER_H), &animator)
-
-		go Seeker(mux.MakeEnv(),
-			framesChanged, cursorChanged,
-			seekerChanged1, seekerChanged2,
-			image.Rect(0, RENDERER_H, RENDERER_W, RENDERER_H+SEEKER_H), colorTheme)
-
-		go DataViewer(mux.MakeEnv(),
-			framesChanged, seekerChanged2, energyProfiler,
-			image.Rect(0, RENDERER_H + SEEKER_H, RENDERER_W, RENDERER_H+SEEKER_H+BOT_PANEL_H), colorTheme, &simulation)
-
-	}
-
-
-	//simulationToggle <- true
-	//animationToggle <- true
 
 
 	// we use the master env now, w is used by the mux
@@ -213,8 +244,8 @@ func run() {
 
 // Background Process for starting/stopping simulation
 func Simulator(env gui.Env,
-	simToggle <-chan bool, 										// input
-	framesChanged chan<- int, energyProfiler chan<- float64,    // output
+	simToggle <-chan bool,            					 			  // input
+	framesChanged chan<- int, energyProfiler chan<- float64, energyProfilerReset chan<- bool, // output
 	simulation *sim.Simulation, animator *sim.Animator) {
 
 	running := false
@@ -227,7 +258,6 @@ func Simulator(env gui.Env,
 				simulation.Step()
 				energy := simulation.TotalEnergy()
 				//energy := simulation.TotalDensity()
-
 				animator.Frame()
 				framesChanged  <- len(animator.Frames)
 				energyProfiler <- energy
@@ -278,8 +308,8 @@ func Seeker(env gui.Env,
 				frameDx = float32(SEEKER_MIN_W)
 			} else {
 				for i := range frameCount {
-					frameRect.Min.X = int(frameDx * float32(i))   + SEEKER_FRAME_MARGIN / 2
-					frameRect.Max.X = int(frameDx * float32(i+1)) - SEEKER_FRAME_MARGIN / 2
+					frameRect.Min.X = int(frameDx * float32(i))   + SEEKER_PAD / 2
+					frameRect.Max.X = int(frameDx * float32(i+1)) - SEEKER_PAD / 2
 					draw.Draw(drw, frameRect, imgUni, image.ZP, draw.Src)
 				}
 			}
@@ -359,8 +389,8 @@ func Seeker(env gui.Env,
 
 
 func Renderer(env gui.Env,
-	aniToggle <-chan bool, seekerChanged1 <-chan int, // input
-	cursorCh chan<- int, seekerChanged2	chan<- int,	 // output
+	aniToggle <-chan bool, seekerChanged1 <-chan int, drawOnce <-chan bool, // input
+	cursorCh chan<- int, seekerChanged2	chan<- int,                     // output
 	r image.Rectangle, animator *sim.Animator) {
 
 	drawFrame := func(i int) func(draw.Image) image.Rectangle {
@@ -373,8 +403,6 @@ func Renderer(env gui.Env,
 			}
 		}
 
-		animator.ActiveFrame = i
-
 		return func(drw draw.Image) image.Rectangle {
 			draw.Draw(drw, r, animator.Frames[i], image.ZP, draw.Src)
 			return r
@@ -384,7 +412,9 @@ func Renderer(env gui.Env,
 
 	needsRedraw := false
 	running := false
+	once := false
 	step := 0
+
 
 	env.Draw() <- drawFrame(step)
 
@@ -410,6 +440,8 @@ func Renderer(env gui.Env,
 			}
 
 			needsRedraw = true
+		case <-drawOnce:
+			once = true
 		default:
 
 			if animator != nil && !running && needsRedraw {
@@ -417,7 +449,7 @@ func Renderer(env gui.Env,
 				needsRedraw = false
 			}
 
-			if running && animator != nil {
+			if (running || once) && animator != nil {
 				if step >= len(animator.Frames) {
 					step = 0
 				}
@@ -427,13 +459,14 @@ func Renderer(env gui.Env,
 				step += 1
 
 				time.Sleep(time.Second / 60)
+				once = false
 			}
 		}
 	}
 }
 
 func DataViewer(env gui.Env,
-	framesCh <-chan int, seekerChanged <-chan int, energyProfiler <-chan float64, // input
+	framesCh <-chan int, seekerChanged <-chan int, energyProfiler <-chan float64, energyProfilerReset <-chan bool,// input
 	r image.Rectangle, colorTheme *Theme, simulation *sim.Simulation) {
 
 	redraw := func(energies []float64, cursorPos int) func(drw draw.Image) image.Rectangle {
@@ -454,7 +487,7 @@ func DataViewer(env gui.Env,
 			minE := slices.Max(energies)
 			maxE := slices.Min(energies)
 			dE   := maxE - minE
-			dx   := float32(r.Dx()) / float32(frameCount)
+			dx   := float32(r.Dx()) / float32(frameCount+1)
 
 			// draw cursor
 			// TODO: make cursor here and in seeker behave the same
@@ -469,8 +502,8 @@ func DataViewer(env gui.Env,
 			rect := r
 			for i := range frameCount {
 				h := int((energies[i] - minE) / dE * float64(r.Dy())) + r.Min.Y
-				rect.Min.X = int(dx * float32(i))
-				rect.Max.X = int(dx * float32(i+1))
+				rect.Min.X = int(dx * float32(i+1))
+				rect.Max.X = int(dx * float32(i+2))
 				rect.Min.Y = h
 				rect.Max.Y = h+2
 				draw.Draw(drw, rect, col, image.ZP, draw.Src)
@@ -491,9 +524,111 @@ func DataViewer(env gui.Env,
 		case energy := <-energyProfiler:
 			energies = append(energies, energy)
 			env.Draw() <- redraw(energies, cursorPos)
+		case <-energyProfilerReset:
+			energies = energies[:0]
+			cursorPos = 0
+			env.Draw() <- redraw(energies, cursorPos)
+		}
+	}
+}
+
+func ConfigChoser(env gui.Env, configFolder string,
+	r image.Rectangle, colorTheme *Theme, mu *sync.Mutex, callback func(string)) {
+
+	entries, err := os.ReadDir("./")
+	if err != nil {
+		panic(err)
+	}
+
+	configFilePaths := make([]string, 0, 20)
+    for _, e := range entries {
+    	if strings.HasSuffix(e.Name(), ".sph-config") {
+			configFilePaths = append(configFilePaths, e.Name())
+    	}
+    }
+
+	// make textures for options
+	textImagesUp    := make([]image.Image, 0, len(configFilePaths))
+	textImagesHover := make([]image.Image, 0, len(configFilePaths))
+	for _, path := range configFilePaths {
+		text := path
+		var textImageUp    image.Image
+		var textImageHover image.Image
+		{
+			mu.Lock()
+			textImageUp    = RenderText(text, colorTheme.OptionText, colorTheme.OptionUp, colorTheme.FontFace)
+			textImageHover = RenderText(text, colorTheme.OptionText, colorTheme.OptionHover, colorTheme.FontFace)
+			mu.Unlock()
+		}
+		textImagesUp    = append(textImagesUp, textImageUp)
+		textImagesHover = append(textImagesHover, textImageHover)
+	}
+
+
+	drawOption := func(index int, hover bool) func(draw.Image) image.Rectangle {
+
+		rect := r
+		rect.Min.Y = r.Min.Y + index * OPTION_H
+		rect.Max.Y = r.Min.Y + (index + 1)  * OPTION_H - OPTION_PAD
+
+		return func(drw draw.Image) image.Rectangle {
+			var textImage image.Image
+			var buttonBg  image.Image
+			if hover {
+				buttonBg  = image.NewUniform(colorTheme.OptionHover)
+				textImage = textImagesHover[index]
+			} else {
+				buttonBg  = image.NewUniform(colorTheme.OptionUp)
+				textImage = textImagesUp[index]
+			}
+
+			draw.Draw(drw, rect, buttonBg, image.ZP, draw.Src)
+			textRect := rect
+			textRect.Min.Y += textRect.Dy()/2 - textImage.Bounds().Dy()/2
+			textRect.Min.X += textRect.Dx()/2 - textImage.Bounds().Dx()/2
+
+			draw.Draw(drw, textRect, textImage, textImage.Bounds().Min, draw.Src)
+			return rect
 		}
 	}
 
+	for i := range configFilePaths {
+		env.Draw() <- drawOption(i, false)
+	}
+
+	over := -1
+
+	exit:
+	for event := range env.Events() {
+		switch event := event.(type) {
+		case win.MoDown:
+			i := (event.Point.Y - r.Min.Y) / OPTION_H
+			if event.Point.In(r) && i >= 0 && i < len(configFilePaths) {
+				fmt.Println(i)
+				callback(configFilePaths[i])
+			}
+			break exit
+		case win.MoMove:
+			if event.Point.In(r) {
+				supposedIndex := (event.Point.Y - r.Min.Y) / OPTION_H
+				if supposedIndex != over && supposedIndex >= 0 && supposedIndex < len(configFilePaths){
+					env.Draw() <- drawOption(supposedIndex, true)
+					if over >= 0 {
+						env.Draw() <- drawOption(over, false)
+					}
+					over = supposedIndex
+				}
+			}
+		}
+	}
+
+	env.Draw() <- func(drw draw.Image) image.Rectangle {
+		bg  := image.NewUniform(colorTheme.Background)
+		draw.Draw(drw, r, bg, image.ZP, draw.Src)
+		return r
+	}
+
+	close(env.Draw())
 }
 
 func RenderText(text string, textColor, btnColor color.RGBA, fontFace font.Face) (draw.Image) {

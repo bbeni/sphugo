@@ -2,3 +2,4 @@ out*
 documentation
 *.pdf
 *.exe
+*.sph-config
