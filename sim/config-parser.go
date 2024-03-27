@@ -692,14 +692,23 @@ func GenerateDefaultConfigFile(filePath string) {
 	// and it generates 2 example files instead of one
 
 
-var exampleConfigSource1 = `[[Simulation]]
+var exampleConfigSource1 = `//  Config file for SPHUGO SPH Simulation
+//  This is an example configuration.
+//  <- This is a line comment (only allowed at start of line)
+//
+//	[[Boundaries]]
+//  [[Sources]]
+//  are not implemented as of now !!
+//
+
+[[Simulation]]
 [Constants]
 NSteps              1000
 Gamma               1.666
 ParticleMass        1
 // A 2-D Vector just has 2 components separated by space(s)
 Acceleration        0       0.5
-DeltaTHalf          0.001
+DeltaTHalf          0.0024
 
 // Coordinates of viewport for animation
 [Viewport]
@@ -711,7 +720,7 @@ LowerRight          1       1
 [UniformRect]
 NParticles          2500
 UpperLeft           0.6     0.1
-LowerRight          0.95    0.4
+LowerRight          0.95    0.7
 [UniformRect]
 NParticles          1000
 UpperLeft           0.1     0.1
@@ -751,8 +760,8 @@ NSteps              1000
 Gamma               1.666
 ParticleMass        1
 // A 2-D Vector just has 2 components separated by space(s)
-Acceleration        0       1.5
-DeltaTHalf          0.004
+Acceleration        0       0.43
+DeltaTHalf          0.01624
 
 // Coordinates of viewport for animation
 [Viewport]
@@ -762,13 +771,13 @@ LowerRight          1       1
 // Initial configuration
 [[Start]]
 [UniformRect]
-NParticles          2500
+NParticles          4500
 UpperLeft           0.6     0.1
-LowerRight          0.9     0.4
+LowerRight          0.95    0.4
 [UniformRect]
 NParticles          1000
 UpperLeft           0.1     0.1
-LowerRight          0.4     0.4
+LowerRight          0.4     0.5
 
 // Per default boundaries are open
 [[Boundaries]]

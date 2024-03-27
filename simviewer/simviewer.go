@@ -137,8 +137,8 @@ func run() {
 	animator   := sim.MakeAnimator(&simulation)
 
 	// TODO: cleanup this mess, too many channels and/or missleading names!
-	simulationToggle := make(chan bool)
-	animationToggle  := make(chan bool)
+	simulationToggle := make(chan bool) // if false is sent it turns it off
+	animationToggle  := make(chan bool) // if false is sent it turns it off
 	framesChanged    := make(chan int)
 	cursorChanged    := make(chan int)
 	seekerChanged1   := make(chan int)
@@ -207,9 +207,10 @@ func run() {
 		go Button(mux.MakeEnv(), "Load Configuration", colorTheme,
 			image.Rect(xa, 4*(BTN_H+MARGIN_BOT), xb, 4*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu,
 			func() {
-				// TODO: fix bug crash when runnning simulation and at the clicking here
 				go ConfigChoser(mux.MakeEnv(), "./", image.Rect(xa, 5*(BTN_H+MARGIN_BOT), xb, H), colorTheme, &fontMu,
 					func(configPath string) {
+						simulationToggle <- false
+						animationToggle <- false
 						simulation = sim.MakeSimulationFromConfig(configPath)
 						animator   = sim.MakeAnimator(&simulation)
 						drawOnce <- true
@@ -220,7 +221,6 @@ func run() {
 				})
 		})
 	}
-
 
 
 	// we use the master env now, w is used by the mux
@@ -251,8 +251,13 @@ func Simulator(env gui.Env,
 	running := false
 	for {
 		select {
-		case <-simToggle:
-			running = !running
+		case x := <-simToggle:
+			// in case really wanna turn it off
+			if !x {
+				running = false
+			} else {
+				running = !running
+			}
 		default:
 			if running {
 				simulation.Step()
@@ -423,8 +428,12 @@ func Renderer(env gui.Env,
 	// maybe not here the lag happens! probably in other part of code
 	for {
 		select{
-		case <- aniToggle:
-			running = !running
+		case x := <-aniToggle:
+			if !x {
+				running = false
+			} else {
+				running = !running
+			}
 		case frameNumber := <-seekerChanged1:
 			step = frameNumber
 
@@ -604,7 +613,6 @@ func ConfigChoser(env gui.Env, configFolder string,
 		case win.MoDown:
 			i := (event.Point.Y - r.Min.Y) / OPTION_H
 			if event.Point.In(r) && i >= 0 && i < len(configFilePaths) {
-				fmt.Println(i)
 				callback(configFilePaths[i])
 			}
 			break exit
