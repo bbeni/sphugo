@@ -39,6 +39,7 @@ func (particle *Particle) FindNearestNeighboursPeriodic(root *Cell) {
 func (particle *Particle) findNNRec(root *Cell, offset Vec2) {
 
 	pos := particle.Pos.Add(&offset)
+
 	if root.Upper == nil && root.Lower == nil {
 		for i := range root.Particles {
 			d2 := DistSq(pos, root.Particles[i].Pos)
@@ -103,6 +104,7 @@ func (p *Particle) NNQueuePeekKey() float64 {
 
 // This is actually faster than the heapque. it's probably beacuse we only have 32 NN's
 // TODO: compare for other NN_SIZEs than 32
+//    using copy() is actually slower, because it is not inlined  anymore by the compiler
 func (p *Particle) NNQueueInsert(dist float64, neighbour *Particle, realPos Vec2) {
 	var i uint8 = 1
 	for ;i<NN_SIZE && p.NNDists[i] > dist; i++ {
@@ -110,6 +112,10 @@ func (p *Particle) NNQueueInsert(dist float64, neighbour *Particle, realPos Vec2
 		p.NearestNeighbours[i-1] = p.NearestNeighbours[i]
 		p.NNPos[i-1] = p.NNPos[i]
 	}
+	//copy(p.NNDists[:i-1], p.NNDists[1:i])
+	//copy(p.NearestNeighbours[:i-1], p.NearestNeighbours[1:i])
+	//copy(p.NNPos[:i-1], p.NNPos[1:i])
+
 	p.NNDists[i-1] = dist
 	p.NearestNeighbours[i-1] = neighbour
 	p.NNPos[i-1] = realPos
