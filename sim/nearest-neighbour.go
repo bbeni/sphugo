@@ -86,8 +86,6 @@ func (particle *Particle) findNNRec(root *Cell, offset Vec2) {
 	}
 }
 
-
-
 // not used/ not sure if it is correct?
 // dist squared to cell
 func (cell *Cell) DistSquared(to *Vec2) float64 {
@@ -98,17 +96,23 @@ func (cell *Cell) DistSquared(to *Vec2) float64 {
 	return maxx*maxx + maxy*maxy
 }
 
-
 func (p *Particle) NNQueuePeekKey() float64 {
 	return p.NNDists[0]
 }
 
-// O(log(n))
+
+// This is actually faster than the heapque. it's probably beacuse we only have 32 NN's
+// TODO: compare for other NN_SIZEs than 32
 func (p *Particle) NNQueueInsert(dist float64, neighbour *Particle, realPos Vec2) {
-	p.NNDists[0] = dist
-	p.NearestNeighbours[0] = neighbour
-	p.NNPos[0] = realPos
-	NNQueueHeapify(p, 0)
+	var i uint8 = 1
+	for ;i<NN_SIZE && p.NNDists[i] > dist; i++ {
+		p.NNDists[i-1] = p.NNDists[i]
+		p.NearestNeighbours[i-1] = p.NearestNeighbours[i]
+		p.NNPos[i-1] = p.NNPos[i]
+	}
+	p.NNDists[i-1] = dist
+	p.NearestNeighbours[i-1] = neighbour
+	p.NNPos[i-1] = realPos
 }
 
 // TODO(#6): @Speed use memcopy
@@ -117,33 +121,5 @@ func (p *Particle) NNQueueInitSentinel() {
 		p.NNDists[i] = math.MaxFloat64
 		p.NearestNeighbours[i] = nil
 		p.NNPos[i] = Vec2{}
-	}
-}
-
-
-func NNQueueHeapify(p *Particle, i int) {
-	for {
-		l := i*2 + 1
-		r := i*2 + 2
-		max_index := i
-
-		if l < NN_SIZE && p.NNDists[max_index] < p.NNDists[l]{
-			max_index = l
-		}
-
-		if r < NN_SIZE && p.NNDists[max_index] < p.NNDists[r] {
-			max_index = r
-		}
-
-		if max_index == i {
-			break
-		}
-
-		// swap elements
-		p.NNDists[i], p.NNDists[max_index] = p.NNDists[max_index], p.NNDists[i]
-		p.NearestNeighbours[i], p.NearestNeighbours[max_index] = p.NearestNeighbours[max_index], p.NearestNeighbours[i]
-		p.NNPos[i], p.NNPos[max_index] = p.NNPos[max_index], p.NNPos[i]
-
-		i = max_index
 	}
 }
