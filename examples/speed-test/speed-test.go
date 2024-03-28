@@ -4,14 +4,26 @@ import (
 	"github.com/bbeni/sphugo/sim"
 	"fmt"
 	"time"
+	"runtime/pprof"
+	"os"
 )
 
 
 
 func main() {
 
+	f, err := os.Create("myprogram.prof")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	pprof.StartCPUProfile(f)
+	defer pprof.StopCPUProfile()
+
+
 	spwn := sim.MakeUniformRectSpawner()
-	spwn.NParticles = 10000
+	spwn.NParticles = 100000
 
 	conf := sim.MakeConfig()
 	conf.Start = append(conf.Start, spwn)
@@ -23,7 +35,7 @@ func main() {
 	previous := time.Now()
 	total := 0.0
 
-	for i := range 200 {
+	for i := range 20 {
 		sph.Step()
 
 		elapsed := time.Since(previous).Seconds()
@@ -33,5 +45,5 @@ func main() {
 		fmt.Println("Step", i, "FPS", 1/elapsed)
 	}
 
-	fmt.Printf("Took %.4v seconds, and got an average FPS of %.4v", total, 200/total)
+	fmt.Printf("Took %.4v seconds, and got an average FPS of %.4v", total, 20/total)
 }
