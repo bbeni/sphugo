@@ -115,11 +115,14 @@ func (p *Particle) NNQueueInsert(dist float64, neighbour *Particle, realPos Vec2
 	p.NNPos[i-1] = realPos
 }
 
-// TODO(#6): @Speed use memcopy
 func (p *Particle) NNQueueInitSentinel() {
 	for i := range NN_SIZE {
-		p.NNDists[i] = math.MaxFloat64
-		p.NearestNeighbours[i] = nil
-		p.NNPos[i] = Vec2{}
+		// This assumes the particles don't move more than
+		// this value can be optimized, but actually might introduce errors in low density regions
+		// @Inclomple be careful when changing coordinate system
+		// TODO: make sure it's not too bad
+		//
+		//p.NNDists[i] = math.MaxFloat64
+		p.NNDists[i] += 0.4
 	}
 }
