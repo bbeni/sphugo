@@ -64,6 +64,5 @@ func DistSq(a, b Vec2) float64 {
 }
 
 func Dist(a, b Vec2) float64 {
-	dx, dy := a.X - b.X, a.Y - b.Y
-	return math.Hypot(dx, dy)
+	return math.Hypot(a.X - b.X, a.Y - b.Y)
 }

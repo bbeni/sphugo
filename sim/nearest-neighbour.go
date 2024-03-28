@@ -103,6 +103,7 @@ func (p *Particle) NNQueuePeekKey() float64 {
 	return p.NNDists[0]
 }
 
+// O(log(n))
 func (p *Particle) NNQueueInsert(dist float64, neighbour *Particle, realPos Vec2) {
 	p.NNDists[0] = dist
 	p.NearestNeighbours[0] = neighbour
@@ -118,6 +119,7 @@ func (p *Particle) NNQueueInitSentinel() {
 		p.NNPos[i] = Vec2{}
 	}
 }
+
 
 func NNQueueHeapify(p *Particle, i int) {
 	for {
