@@ -231,7 +231,36 @@ func DensityTopHat2D(p *Particle) (float64) {
 }
 
 
-func DensityMonahan2D(p *Particle, sim *Simulation) (float64) {
+type Kernel struct {
+	F func(q float64) float64
+	FPrefactor float64
+	DF func(q float64) float64
+	DFPrefactor float64
+}
+
+var Monahan2D = Kernel{
+	F: func(q float64) float64 {
+		if q < 0.5 {
+			return q*q*q - q*q + 1.0/6
+		}
+		return (1 - q)*(1 - q)*(1 - q) / 3
+	},
+
+	FPrefactor:  6 * 40 / (math.Pi * 7),
+
+	DF: func(q float64) float64 {
+		if q < 0.5 {
+			return (3*q*q - 2*q)
+		}
+	 	return -(1 - q)*(1 - q)
+	},
+
+	DFPrefactor: 6 * 40 / (math.Pi * 7),
+}
+
+
+
+func Density2D(p *Particle, sim *Simulation, kernel Kernel) (float64) {
 	maxR := p.NNDists[0]
 
 	acc := 0.0
@@ -244,21 +273,15 @@ func DensityMonahan2D(p *Particle, sim *Simulation) (float64) {
 		if x > 1 || x < 0 {
 			panic("unreachable")
 		}
-
-		if x < 0.5 {
-			acc += x*x*x - x*x + 1.0/6
-			continue
-		}
-		acc += (1 - x)*(1 - x)*(1 - x) / 3
+		acc += kernel.F(x)
 	}
 
-	return sim.Config.ParticleMass*acc*6*40/(math.Pi*maxR*maxR*7)
+	return kernel.FPrefactor * sim.Config.ParticleMass * acc / (maxR*maxR)
 }
-
 
 // - Sum [ (Pa/rhoa^2       + Pb/rhob^2     + PIab )]
 //			contribution A  + contributionB
-func AccelerationAndEDotMonahan2D(p *Particle, sim *Simulation) {
+func AccelerationAndEDot2D(p *Particle, sim *Simulation, kernel Kernel) {
 	gamma := sim.Config.Gamma
 	maxR  := p.NNDists[0]
 
@@ -286,12 +309,7 @@ func AccelerationAndEDotMonahan2D(p *Particle, sim *Simulation) {
 		// Kernel
 		//
 
-		// TODO: make it exchangable easily
-		if q < 0.5 {
-			dRKernel = (3*q*q - 2*q)
-		} else {
-		 	dRKernel = -(1 - q)*(1 - q)
-		}
+		dRKernel = kernel.DF(q)
 
 		// PB / rhoB^2
 		contributionB = nn.C*nn.C / (gamma*nn.Rho)
@@ -338,7 +356,7 @@ func AccelerationAndEDotMonahan2D(p *Particle, sim *Simulation) {
 	}
 
 	acc := Vec2{acc_ax, acc_ay}
-    acc = acc.Mul(6 * 40 * sim.Config.ParticleMass / (7 * math.Pi * maxR*maxR*maxR))
+    acc = acc.Mul(sim.Config.ParticleMass * kernel.DFPrefactor / (maxR*maxR*maxR))
     acc = acc.Add(&sim.Config.Acceleration)
 	p.VDot = acc
 	p.EDot = contributionA * acc_edot * sim.Config.ParticleMass // Benz formulation
@@ -364,7 +382,7 @@ func (sim *Simulation) CalculateForces() {
 		for i, _ := range sim.Root.Particles {
 			p := &sim.Root.Particles[i]
 			//p.Rho = DensityTopHat2D(p)
-			p.Rho = DensityMonahan2D(p, sim)
+			p.Rho = Density2D(p, sim, Monahan2D)
 			//fmt.Println(p.Rho)
 		}
 	}
@@ -386,7 +404,7 @@ func (sim *Simulation) CalculateForces() {
 	{
 		// TODO(#4): implement NN forces
 		for i, _ := range sim.Root.Particles {
-			AccelerationAndEDotMonahan2D(&sim.Root.Particles[i], sim)
+			AccelerationAndEDot2D(&sim.Root.Particles[i], sim, Monahan2D)
 		}
 	}
 
