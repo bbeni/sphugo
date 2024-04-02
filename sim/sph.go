@@ -258,6 +258,33 @@ var Monahan2D = Kernel{
 	DFPrefactor: 6 * 40 / (math.Pi * 7),
 }
 
+// change varibales from lecture to adapt for factor of 2 in h
+// q -> 2*q
+// 1/h -> 2/rmax
+// 2d F  prefactor -> 4 * ..
+// 2d DF prefactor -> 8 * ..
+
+var Wendtland2D = Kernel{
+	F: func(q float64) float64 {
+		if q <= 1 {
+			return (1 - q)*(1 - q)*(1 - q)*(1 - q)*(1 + 4*q)
+		} else {
+			panic("not good..")
+		}
+	},
+
+	FPrefactor: 4 * 7 / (math.Pi * 4),
+
+	DF: func(q float64) float64 {
+		if q <= 1 {
+			return -10 * q * (1 - q)*(1 - q)*(1 - q)
+		} else {
+			panic("not good..")
+		}
+	},
+
+	DFPrefactor: 8 * 7 / (math.Pi * 4),
+}
 
 
 func Density2D(p *Particle, sim *Simulation, kernel Kernel) (float64) {
@@ -304,10 +331,6 @@ func AccelerationAndEDot2D(p *Particle, sim *Simulation, kernel Kernel) {
 		if q > 1 || q < 0 {
 			panic("kernel parameter q not in [0, 1]!")
 		}
-
-		//
-		// Kernel
-		//
 
 		dRKernel = kernel.DF(q)
 
@@ -377,14 +400,9 @@ func (sim *Simulation) CalculateForces() {
 	}
 
 	// Calculate Nearest Neighbor Density Rho
-	{
-		// TODO(#3): implement NN density
-		for i, _ := range sim.Root.Particles {
-			p := &sim.Root.Particles[i]
-			//p.Rho = DensityTopHat2D(p)
-			p.Rho = Density2D(p, sim, Monahan2D)
-			//fmt.Println(p.Rho)
-		}
+	for i, _ := range sim.Root.Particles {
+		p := &sim.Root.Particles[i]
+		p.Rho = Density2D(p, sim, sim.Config.Kernel)
 	}
 
 
@@ -401,19 +419,14 @@ func (sim *Simulation) CalculateForces() {
 
 	// Calculate Nearest Neighbor SPH forces
 	// VDot, EDot
-	{
-		// TODO(#4): implement NN forces
-		for i, _ := range sim.Root.Particles {
-			AccelerationAndEDot2D(&sim.Root.Particles[i], sim, Monahan2D)
-		}
+	for i, _ := range sim.Root.Particles {
+		AccelerationAndEDot2D(&sim.Root.Particles[i], sim, sim.Config.Kernel)
 	}
-
 }
 
 //
 // profiling functions
 //
-
 
 func (sim *Simulation) TotalEnergy() float64 {
 	tot := 0.0

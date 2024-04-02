@@ -22,33 +22,11 @@ import (
 
 // For now these Titles and Subtitles are valid
 var validTitleSubtitles = map[string][]string{
-	"Simulation": {"Constants", "Viewport"},
+	"Simulation": {"Config", "Viewport"},
 	"Start": 	  {"UniformRect"},
 	"Boundaries": {"Periodic", "Reflection"},
 	"Sources": 	  {"Point"},
 }
-
-/* Valid params:
-  // title,        subtitle,     paramName
-	{"Simulation", "Constants",  "NSteps"},
-	{"Simulation", "Constants",  "Gamma"},
-	{"Simulation", "Constants",  "ParticleMass"},
-	{"Simulation", "Constants",  "DeltaTHalf"},
-	{"Simulation", "Constants",  "Acceleration"},
-	{"Simulation", "Viewport",   "UpperLeft"},
-	{"Simulation", "Viewport",   "LowerRight"},
-	{"Start",      "UniformRect","NParticles"},
-	{"Start",      "UniformRect","UpperLeft"},
-	{"Start",      "UniformRect","LowerRight"},
-	{"Boundaries", "Periodic",   "Left"},
-	{"Boundaries", "Periodic",   "Right"},
-	{"Boundaries", "Reflection", "ToOrigin"},
-	{"Boundaries", "Reflection", "FromOrigin"},
-	{"Sources",    "Point",      "Pos"},
-	{"Sources",    "Point",      "Rate"},
-} */
-
-
 
 type ParticleSource interface {
 	Spawn(t float64) []Particle
@@ -111,6 +89,8 @@ type SphConfig struct {
 	ParticleMass 	float64
 	Acceleration	Vec2
 
+	Kernel			Kernel
+
 	Boundaries  	[]Boundary
 	Reflections	    []Reflection
 	Sources 		[]ParticleSource
@@ -127,6 +107,7 @@ func MakeConfig() SphConfig {
 		NSteps:		  10000,
 		DeltaTHalf:	  0.001,
 		ParticleMass: 1,
+		Kernel:		  Monahan2D,
 		Viewport:  	  [2]Vec2{Vec2{0, 0}, Vec2{1, 1}},
 	}
 }
@@ -147,6 +128,10 @@ type Param struct {
 
 // This function generates a configuration given a tokenized config file
 func (config *SphConfig) updateFromTokens(tokens []Token) {
+
+	//for _, tok := range tokens {
+	//	fmt.Println(tok)
+	//}
 
 	var token Token
 	for len(tokens) > 0 {
@@ -197,28 +182,36 @@ func (config *SphConfig) updateFromTokens(tokens []Token) {
 				continue
 			}
 
-
-
 			// Here we know we should be in the variable definitions
 			// this should never happen?
-			if token.Type != integer && token.Type != float && token.Type != vec2 {
-				ConfigMakeError(token, fmt.Sprintf("Expected either an int, float or Vec2 parameter definition, but got `%v`", token.Type))
+			if token.Type != integer && token.Type != float && token.Type != vec2 && token.Type != word {
+				ConfigMakeError(token, fmt.Sprintf("Expected either an int, float, vec2 or word parameter definition, but got `%v`", token.Type))
 			}
 
 			p := Param{titleStr, subtitleStr, token.Name}
 
 			// TODO: check if values are set more than once
 			switch p {
-			case Param{"Simulation", "Constants", "NSteps"}:
+			case Param{"Simulation", "Config", "NSteps"}:
 				 config.NSteps = checkInt(token, p)
-			case Param{"Simulation", "Constants", "Gamma"}:
-					 config.Gamma  = checkFloat(token, p)
-			case Param{"Simulation", "Constants", "ParticleMass"}:
-					 config.ParticleMass  = checkFloat(token, p)
-			case Param{"Simulation", "Constants", "DeltaTHalf"}:
-					 config.DeltaTHalf   = checkFloat(token, p)
-			case Param{"Simulation", "Constants", "Acceleration"}:
-					 config.Acceleration = checkVec2(token, p)
+			case Param{"Simulation", "Config", "Gamma"}:
+				 config.Gamma  = checkFloat(token, p)
+			case Param{"Simulation", "Config", "ParticleMass"}:
+				 config.ParticleMass  = checkFloat(token, p)
+			case Param{"Simulation", "Config", "DeltaTHalf"}:
+				 config.DeltaTHalf   = checkFloat(token, p)
+			case Param{"Simulation", "Config", "Acceleration"}:
+				 config.Acceleration = checkVec2(token, p)
+			case Param{"Simulation", "Config", "Kernel"}:
+				kernel := token.AsStr
+				if kernel == "Monahan" {
+					config.Kernel = Monahan2D
+				} else if kernel == "Wendtland" {
+					config.Kernel = Wendtland2D
+				} else {
+					ConfigMakeError(token, fmt.Sprintf("Kernel `%v` is not implemented", kernel))
+				}
+
 			case Param{"Simulation", "Viewport", "UpperLeft"}:
 					 config.Viewport[0] = checkVec2(token, p)
 			case Param{"Simulation", "Viewport", "LowerRight"}:
@@ -350,6 +343,7 @@ const (
 	integer
 	float
 	vec2
+	word
 )
 
 type Token struct {
@@ -425,73 +419,91 @@ func Tokenize(fname string) []Token {
 			varName := string(t.chopUntilIs(notALetter, "a letter as start of a parmeter name"))
 			startRow := t.cursor - t.bol + 1
 			t.expectIs(aWhitespace, "a whitepsace")
+			t.trimLeft()
 
-			toParse := make([]string, 0, 2)
-			nNumbersFound := 0
-			isThereAFloat := false
-			for {
-				t.trimLeft()
-				if nNumbersFound == 0 {
-					t.expectIs(aDigit, "a digit for parsing as int or float")
-				} else {
-					if len(t.text) == 0 || t.text[0] == '\n' {
-						break
+			if t.is(aDigit) { // parse a float/int/vec2
+				toParse := make([]string, 0, 2)
+				nNumbersFound := 0
+				isThereAFloat := false
+
+				for {
+					t.trimLeft()
+					if nNumbersFound != 0 {
+						if len(t.text) == 0 || t.text[0] == '\n' {
+							break
+						}
+						t.expectIs(aDigit, "a digit for parsing as int or float")
 					}
-					t.expectIs(aDigit, "a digit for parsing as int or float")
+
+					leftPart := t.chopUntilIsNoFail(notADigit)
+					if len(t.text) != 0 && t.text[0] == '.' {
+						//got float
+						t.chop(1)
+						rightPart := t.chopUntilIs(notADigit, "that there is no digit here")
+						t.expectIs(unicode.IsSpace, "a whitespace or newline")
+						toParse = append(toParse, string(leftPart) + "." + string(rightPart))
+						isThereAFloat = true
+					} else if len(t.text) == 0 || unicode.IsSpace(t.text[0]) {
+						//got int
+						toParse = append(toParse, string(leftPart))
+					} else {
+						fmt.Printf("%v:%v:%v: In number literal expected a `.` or a digit \n", t.fname, t.line+1, t.cursor - t.bol + 1)
+						os.Exit(1)
+					}
+					nNumbersFound += 1
+					if nNumbersFound > 2 {
+						fmt.Printf("%v:%v:%v: Cannot parse a Vector with more than 2 dimensions \n", t.fname, t.line+1, t.cursor - t.bol + 1)
+						os.Exit(1)
+					}
+				}
+				if nNumbersFound == 0 {
+					fmt.Printf("%v:%v:%v: Expected at least one numbere here \n", t.fname, t.line+1, t.cursor - t.bol + 1)
+					os.Exit(1)
 				}
 
-				leftPart := t.chopUntilIsNoFail(notADigit)
-				if len(t.text) != 0 && t.text[0] == '.' {
-					//got float
-					t.chop(1)
-					rightPart := t.chopUntilIs(notADigit, "that there is no digit here")
-					t.expectIs(unicode.IsSpace, "a whitespace or newline")
-					toParse = append(toParse, string(leftPart) + "." + string(rightPart))
-					isThereAFloat = true
-				} else if len(t.text) == 0 || unicode.IsSpace(t.text[0]) {
-					//got int
-					toParse = append(toParse, string(leftPart))
+
+				// one numer
+				if nNumbersFound == 1 {
+					if isThereAFloat {
+						// parse as float
+						x, err := strconv.ParseFloat(toParse[0], 64)
+						check(err)
+						tokens = append(tokens, Token{Name: varName, Type: float, AsFloat: x, Line: t.line+1, Row: startRow, Fname:&fname})
+
+					} else {
+						// parse as int
+						x, err := strconv.ParseInt(toParse[0], 10, 64)
+						check(err)
+						tokens = append(tokens, Token{Name: varName, Type: integer, AsInt: x, Line: t.line+1, Row: startRow, Fname:&fname})
+					}
+				} else if nNumbersFound == 2 {
+
+						// parse as vec2
+						x1, err := strconv.ParseFloat(toParse[0], 64)
+						check(err)
+						x2, err := strconv.ParseFloat(toParse[1], 64)
+						check(err)
+						tokens = append(tokens, Token{Name: varName, Type: vec2, AsVec2: Vec2{x1, x2}, Line: t.line+1, Row: startRow, Fname:&fname})
 				} else {
-					fmt.Printf("%v:%v:%v: In number literal expected a `.` or a digit \n", t.fname, t.line+1, t.cursor - t.bol + 1)
+					panic("unreachable")
+				}
+
+
+			} else if t.is(aLetter) { // parse a word
+				supposedWord := string(t.chopUntilIsNoFail(notALetter))
+				if len(supposedWord) == 0 || !t.is(unicode.IsSpace) {
+					fmt.Printf("%v:%v:%v: `%v` Excpected only Letters and a whitespace at the end to form a Word\n", t.fname, t.line+1, t.cursor - t.bol + 1, string(supposedWord))
 					os.Exit(1)
 				}
-				nNumbersFound += 1
-				if nNumbersFound > 2 {
-					fmt.Printf("%v:%v:%v: Cannot parse a Vector with more than 2 dimensions \n", t.fname, t.line+1, t.cursor - t.bol + 1)
-					os.Exit(1)
-				}
-			}
-			if nNumbersFound == 0 {
-				fmt.Printf("%v:%v:%v: Expected at least one numbere here \n", t.fname, t.line+1, t.cursor - t.bol + 1)
+
+				tokens = append(tokens, Token{Name: varName, Type: word, AsStr: supposedWord, Line: t.line+1, Row: startRow, Fname: &fname})
+
+			} else {
+				fmt.Printf("%v:%v:%v: `%v` Excpected a Number/Vec2 or Word", t.fname, t.line+1, t.cursor - t.bol + 1, varName)
 				os.Exit(1)
 			}
 
 
-			// one numer
-			if nNumbersFound == 1 {
-				if isThereAFloat {
-					// parse as float
-					x, err := strconv.ParseFloat(toParse[0], 64)
-					check(err)
-					tokens = append(tokens, Token{Name: varName, Type: float, AsFloat: x, Line: t.line+1, Row: startRow, Fname:&fname})
-
-				} else {
-					// parse as int
-					x, err := strconv.ParseInt(toParse[0], 10, 64)
-					check(err)
-					tokens = append(tokens, Token{Name: varName, Type: integer, AsInt: x, Line: t.line+1, Row: startRow, Fname:&fname})
-				}
-			} else if nNumbersFound == 2 {
-
-					// parse as float
-					x1, err := strconv.ParseFloat(toParse[0], 64)
-					check(err)
-					x2, err := strconv.ParseFloat(toParse[1], 64)
-					check(err)
-					tokens = append(tokens, Token{Name: varName, Type: vec2, AsVec2: Vec2{x1, x2}, Line: t.line+1, Row: startRow, Fname:&fname})
-			} else {
-				panic("unreachable")
-			}
 
 		} else {
 			fmt.Println(tokens)
@@ -688,120 +700,7 @@ func inSlice(list []string, a string) bool {
 
 
 func GenerateDefaultConfigFile(filePath string) {
-	// TODO: this looks cursed...
-	// and it generates 2 example files instead of one
-
-
-var exampleConfigSource1 = `//  Config file for SPHUGO SPH Simulation
-//  This is an example configuration.
-//  <- This is a line comment (only allowed at start of line)
-//
-//	[[Boundaries]]
-//  [[Sources]]
-//  are not implemented as of now !!
-//
-
-[[Simulation]]
-[Constants]
-NSteps              1000
-Gamma               1.666
-ParticleMass        1
-// A 2-D Vector just has 2 components separated by space(s)
-Acceleration        0       0.5
-DeltaTHalf          0.0024
-
-// Coordinates of viewport for animation
-[Viewport]
-UpperLeft           0       0
-LowerRight          1       1
-
-// Initial configuration
-[[Start]]
-[UniformRect]
-NParticles          2500
-UpperLeft           0.6     0.1
-LowerRight          0.95    0.7
-[UniformRect]
-NParticles          1000
-UpperLeft           0.1     0.1
-LowerRight          0.4     0.5
-
-// Per default boundaries are open
-[[Boundaries]]
-[Periodic]
-Left                0
-Right               1
-
-// A reflection reflects particles without losing momentum
-[Reflection]
-// A refelection line orthognal to origin that refelcts towards origin
-// ToOrigin         0       0.9
-// A reflection boundary taht excludes origin (top-left corner)
-// FromOrigin       0.2     0.2
-
-[[Sources]]
-[Point]
-//Pos                 0.2     0.2
-//Rate                100`
-
-
-var exampleConfigSource2 = `//  Config file for SPHUGO SPH Simulation
-//  This is an example configuration.
-//  <- This is a line comment (only allowed at start of line)
-//
-//	[[Boundaries]]
-//  [[Sources]]
-//  are not implemented as of now !!
-//
-
-[[Simulation]]
-[Constants]
-NSteps              1000
-Gamma               1.666
-ParticleMass        1
-// A 2-D Vector just has 2 components separated by space(s)
-Acceleration        0       0.43
-DeltaTHalf          0.01624
-
-// Coordinates of viewport for animation
-[Viewport]
-UpperLeft           0       0
-LowerRight          1       1
-
-// Initial configuration
-[[Start]]
-[UniformRect]
-NParticles          4500
-UpperLeft           0.6     0.1
-LowerRight          0.95    0.4
-[UniformRect]
-NParticles          1000
-UpperLeft           0.1     0.1
-LowerRight          0.4     0.5
-
-// Per default boundaries are open
-[[Boundaries]]
-[Periodic]
-Left                0
-Right               1
-
-// A reflection reflects particles without losing momentum
-[Reflection]
-// A refelection line orthognal to origin that refelcts towards origin
-// ToOrigin         0       0.9
-// A reflection boundary taht excludes origin (top-left corner)
-// FromOrigin       0.2     0.2
-
-[[Sources]]
-[Point]
-//Pos                 0.2     0.2
-//Rate                100`
-
-	// TODO: change hardcoded
-	_ = filePath
-
-	GenerateTextFile("./example2.sph-config", exampleConfigSource1)
-	GenerateTextFile("./example.sph-config", exampleConfigSource2)
+	GenerateTextFile(filePath, exampleConfigSource1)
 }
 
 func GenerateTextFile(filePath string, source string) {
@@ -818,3 +717,59 @@ func GenerateTextFile(filePath string, source string) {
 	    }
 	}
 }
+
+var exampleConfigSource1 = `//  Config file for SPHUGO SPH Simulation
+//  This is an example configuration.
+//  <- This is a line comment (only allowed at start of line)
+//
+//	[[Boundaries]]
+//  [[Sources]]
+//  are not implemented as of now !!
+//
+
+[[Simulation]]
+[Config]
+NSteps              1000
+Gamma               1.666
+ParticleMass        2.3
+// A 2-D Vector just has 2 components separated by space(s)
+Acceleration        0     0.01
+DeltaTHalf          0.01124
+//Kernel		    Monahan
+Kernel				Wendtland
+
+// Coordinates of viewport for animation
+[Viewport]
+UpperLeft           0       0
+LowerRight          1       1
+
+// Initial configuration
+[[Start]]
+
+[UniformRect]
+NParticles          500
+UpperLeft           0.6     0.1
+LowerRight          0.95    0.4
+
+[UniformRect]
+NParticles          300
+UpperLeft           0.0     0.1
+LowerRight          0.4     0.8
+
+// NOT IMPLEMENTED FROM HERE ON
+// Per default boundaries are open
+[[Boundaries]]
+[Periodic]
+Left                0
+Right               1
+// A reflection reflects particles without losing momentum
+[Reflection]
+// A refelection line orthognal to origin that refelcts towards origin
+// ToOrigin         0       0.9
+// A reflection boundary taht excludes origin (top-left corner)
+// FromOrigin       0.2     0.2
+
+[[Sources]]
+[Point]
+//Pos                 0.2     0.2
+//Rate                100`
