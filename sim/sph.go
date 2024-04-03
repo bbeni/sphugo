@@ -58,8 +58,6 @@ func MakeSimulationFromConf(conf SphConfig) (Simulation){
 
 }
 
-
-
 func (sim *Simulation) Run() {
 	for step := range sim.Config.NSteps {
 		sim.Step()
@@ -127,63 +125,27 @@ func (sim *Simulation) Step() {
 		// Boundary: particles outside boundary get moved back
 		for i, _ := range sim.Root.Particles {
 			p := &sim.Root.Particles[i]
-			if p.Pos.X >= 1 {
-				p.Pos.X -= 1
-
-				// refelction kind
-				// and set pos back to almost 1
-				p.Vel.X *= -1
-				p.Pos.X  = 0.99999
-			}
-			if p.Pos.Y >= 1 {
-				// periodic
-				// p.Pos.Y -= 1
-
-				// refelction kind
-				// and set pos back to almost 1
-				p.Vel.Y *= -1
-				p.Pos.Y  = 0.99999
+			if p.Pos.X < sim.Config.HorPeriodicity[0] {
+				p.Pos.X += (sim.Config.HorPeriodicity[1] - sim.Config.HorPeriodicity[0])
+			} else if p.Pos.X > sim.Config.HorPeriodicity[1] {
+				p.Pos.X -= (sim.Config.HorPeriodicity[1] - sim.Config.HorPeriodicity[0])
 			}
 
-			if p.Pos.X < 0 {
-				p.Pos.X += 1
-
-				// refelction kind
-				// and set pos back to almost 1
-				p.Vel.X *= -1
-				p.Pos.X  = 0.01
-			}
-
-			if p.Pos.Y < 0 {
-
-				//p.Pos.Y += 1
-
+			if p.Pos.Y < sim.Config.VertPeriodicity[0] {
+				p.Pos.Y += (sim.Config.VertPeriodicity[1] - sim.Config.VertPeriodicity[0])
+			} else if p.Pos.Y > sim.Config.VertPeriodicity[1] {
+				p.Pos.Y -= (sim.Config.VertPeriodicity[1] - sim.Config.VertPeriodicity[0])
 			}
 		}
 
-
-		/*for i, _ := range sim.Root.Particles {
+		// TODO: unhardcode refelction boundaries
+		for i, _ := range sim.Root.Particles {
 			p := &sim.Root.Particles[i]
-
-			if p.Pos.X >= 1 {
-				p.Vel.X = -p.Vel.X
-				p.Pos.X = -p.Pos.X
+			if p.Pos.Y > 0.97 {
+				p.Pos.Y -= p.Pos.Y - 0.97
+				p.Vel.Y = -p.Vel.Y
 			}
-
-			if p.Pos.Y >= 1 {
-				p.Vel.Y = -p.Vel.Y*0.8
-				p.Pos.Y = -p.Pos.Y
-			}
-
-			if p.Pos.X < 0 {
-				p.Vel.X = -p.Vel.X
-				p.Pos.X = -p.Pos.X
-			}
-
-			//if p.Pos.Y < 0 {
-			//	p.Vel.Y = -p.Vel.Y*0.9
-			//}
-		}*/
+		}
 	}
 
 	sim.CurrentStep += 1
@@ -367,12 +329,6 @@ func AccelerationAndEDot2D(p *Particle, sim *Simulation, kernel Kernel) {
 			piAB  = (-alpha*cAB*muAB + beta*muAB*muAB) / rhoAB
 		}
 
-
-
-		if rAB.X > 0.5 || rAB.Y > 0.5 {
-			panic("rX or rY is bigger than expected. more than half boundary")
-		}
-
 		acc_ax += rAB.X * (piAB + contributionA + contributionB) * dRKernel / p.NNDists[i]
 		acc_ay += rAB.Y * (piAB + contributionA + contributionB) * dRKernel / p.NNDists[i]
 		acc_edot += dot * dRKernel
@@ -396,7 +352,7 @@ func (sim *Simulation) CalculateForces() {
 
 	// claculate all nearest neighbours
 	for i, _ := range sim.Root.Particles {
-		sim.Root.Particles[i].FindNearestNeighboursPeriodic(sim.Root)
+		sim.Root.Particles[i].FindNearestNeighboursPeriodic(sim.Root, [2]float64{-1, 2}, [2]float64{-1, 2})
 	}
 
 	// Calculate Nearest Neighbor Density Rho

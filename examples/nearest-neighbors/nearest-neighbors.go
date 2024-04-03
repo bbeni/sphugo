@@ -77,7 +77,7 @@ func Periodic() {
 
 
 	// Find the nearest neighbors of the picked particle and plot them
-	p0.FindNearestNeighboursPeriodic(root)
+	p0.FindNearestNeighboursPeriodic(root, [2]float64{0, 1}, [2]float64{0, 1} )
 	for i := range sim.NN_SIZE {
 		pn := *p0.NearestNeighbours[i]
 		x, y := pn.Pos.X*float64(w), pn.Pos.Y*float64(h)

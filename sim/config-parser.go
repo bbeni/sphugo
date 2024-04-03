@@ -18,6 +18,7 @@ import (
 	"math/rand"
 	"time"
 	"strconv"
+	"math"
 )
 
 // For now these Titles and Subtitles are valid
@@ -46,7 +47,7 @@ func MakeUniformRectSpawner() UniformRectSpawner{
 	}
 }
 
-// spawn onece uniformely in this rect
+// spawn once uniformely in this rect
 func (spwn UniformRectSpawner) Spawn(t float64) []Particle {
 
 	if USE_RANDOM_SEED {
@@ -72,11 +73,6 @@ func (spwn UniformRectSpawner) Spawn(t float64) []Particle {
 }
 
 
-type Boundary struct {
-	Offset	   Vec2
-	IsPeriodic bool
-}
-
 type Reflection struct {
 	Offset	   Vec2
 	FromOrigin bool
@@ -91,7 +87,9 @@ type SphConfig struct {
 
 	Kernel			Kernel
 
-	Boundaries  	[]Boundary
+	HorPeriodicity  [2]float64 // -math.MaxFloat64, math.MaxFloat64 is open
+	VertPeriodicity [2]float64 // -math.MaxFloat64, math.MaxFloat64 is open
+
 	Reflections	    []Reflection
 	Sources 		[]ParticleSource
 	Start			[]ParticleSource
@@ -108,6 +106,10 @@ func MakeConfig() SphConfig {
 		DeltaTHalf:	  0.001,
 		ParticleMass: 1,
 		Kernel:		  Monahan2D,
+
+		VertPeriodicity: [2]float64{-math.MaxFloat64, math.MaxFloat64},
+		HorPeriodicity:  [2]float64{-math.MaxFloat64, math.MaxFloat64},
+
 		Viewport:  	  [2]Vec2{Vec2{0, 0}, Vec2{1, 1}},
 	}
 }
@@ -265,40 +267,28 @@ func (config *SphConfig) updateFromTokens(tokens []Token) {
 				config.Start = append(config.Start, startSpawner)
 
 
-			case Param{"Boundaries", "Periodic", "Left"}:
+			case Param{"Boundaries", "Periodic", "Vertical"}:
 				// TODO: make somehow sure left < right and so on
-					 x := checkFloat(token, p)
-				 config.Boundaries = append(config.Boundaries,
-				 	Boundary{Offset: Vec2{x, 0}, IsPeriodic: true,})
+				x := checkVec2(token, p)
+				config.VertPeriodicity = [2]float64{x.X, x.Y}
 
-			case Param{"Boundaries", "Periodic", "Right"}:
-					x := checkFloat(token, p)
-				 config.Boundaries = append(config.Boundaries,
-				 	Boundary{Offset: Vec2{x, 0}, IsPeriodic: true,})
-
-				case Param{"Boundaries", "Periodic", "Top"}:
-					 x := checkFloat(token, p)
-				 config.Boundaries = append(config.Boundaries,
-				 	Boundary{Offset: Vec2{0, x}, IsPeriodic: true,})
-
-			case Param{"Boundaries", "Periodic", "Bottom"}:
-					 x := checkFloat(token, p)
-				 config.Boundaries = append(config.Boundaries,
-				 	Boundary{Offset: Vec2{0, x}, IsPeriodic: true,})
+			case Param{"Boundaries", "Periodic", "Horizontal"}:
+				x := checkVec2(token, p)
+				config.HorPeriodicity = [2]float64{x.X, x.Y}
 
 			case Param{"Boundaries", "Reflection", "ToOrigin"}:
-				 x := checkVec2(token, p)
-				 config.Reflections = append(config.Reflections,
+				x := checkVec2(token, p)
+				config.Reflections = append(config.Reflections,
 				 	Reflection{Offset: x, FromOrigin: false,})
 			case Param{"Boundaries", "Reflection", "FromOrigin"}:
-				 x := checkVec2(token, p)
-				 config.Reflections = append(config.Reflections,
+				x := checkVec2(token, p)
+				config.Reflections = append(config.Reflections,
 				 	Reflection{Offset: x, FromOrigin: true,})
 
 			case Param{"Sources", "Point", "Pos"}:
-				 panic("TOOD: implement [Point]")
+				panic("TOOD: implement [Point]")
 			case Param{"Sources", "Point", "Rate"}:
-				 panic("TOOD: implement [Point]")
+				panic("TOOD: implement [Point]")
 			default:
 				ConfigMakeError(token, fmt.Sprintf("`%v` is not a valid parameter in `[[%v]]` - `[%v]`", token.Name, titleStr, subtitleStr ))
 			}
@@ -421,10 +411,16 @@ func Tokenize(fname string) []Token {
 			t.expectIs(aWhitespace, "a whitepsace")
 			t.trimLeft()
 
-			if t.is(aDigit) { // parse a float/int/vec2
+			if t.is(aDigit) || t.isExactly('-') { // parse a float/int/vec2
 				toParse := make([]string, 0, 2)
 				nNumbersFound := 0
 				isThereAFloat := false
+
+				negative := false
+				if t.isExactly('-') {
+					negative = true
+					t.chop(1)
+				}
 
 				for {
 					t.trimLeft()
@@ -436,6 +432,12 @@ func Tokenize(fname string) []Token {
 					}
 
 					leftPart := t.chopUntilIsNoFail(notADigit)
+
+					if negative {
+						x := make([]rune, 0, len(leftPart))
+						leftPart = append(x, leftPart...)
+					}
+
 					if len(t.text) != 0 && t.text[0] == '.' {
 						//got float
 						t.chop(1)
@@ -499,7 +501,7 @@ func Tokenize(fname string) []Token {
 				tokens = append(tokens, Token{Name: varName, Type: word, AsStr: supposedWord, Line: t.line+1, Row: startRow, Fname: &fname})
 
 			} else {
-				fmt.Printf("%v:%v:%v: `%v` Excpected a Number/Vec2 or Word", t.fname, t.line+1, t.cursor - t.bol + 1, varName)
+				fmt.Printf("%v:%v:%v: `%v` Excpected a Number/Vec2 or Word\n", t.fname, t.line+1, t.cursor - t.bol + 1, varName)
 				os.Exit(1)
 			}
 
@@ -507,7 +509,7 @@ func Tokenize(fname string) []Token {
 
 		} else {
 			fmt.Println(tokens)
-			panic(fmt.Sprintf("%v:%v: unimplemented - starts with: `%v`", t.line, t.cursor - t.bol + 1, string(t.text[0])))
+			panic(fmt.Sprintf("%v:%v: unimplemented - starts with: `%v`\n", t.line, t.cursor - t.bol + 1, string(t.text[0])))
 		}
 	}
 
@@ -721,55 +723,60 @@ func GenerateTextFile(filePath string, source string) {
 var exampleConfigSource1 = `//  Config file for SPHUGO SPH Simulation
 //  This is an example configuration.
 //  <- This is a line comment (only allowed at start of line)
-//
-//	[[Boundaries]]
-//  [[Sources]]
-//  are not implemented as of now !!
-//
+
 
 [[Simulation]]
 [Config]
 NSteps              1000
-Gamma               1.666
-ParticleMass        2.3
+Gamma               4.666
+ParticleMass        1000000.0
 // A 2-D Vector just has 2 components separated by space(s)
-Acceleration        0     0.01
-DeltaTHalf          0.01124
+Acceleration        0       0.05
+DeltaTHalf          0.00424
 //Kernel		    Monahan
 Kernel				Wendtland
 
-// Coordinates of viewport for animation
-[Viewport]
-UpperLeft           0       0
-LowerRight          1       1
 
-// Initial configuration
+// Initial setup of particles, for now we can add Uniformely Random distributed Rectangels only
 [[Start]]
 
 [UniformRect]
-NParticles          500
-UpperLeft           0.6     0.1
-LowerRight          0.95    0.4
+NParticles          260
+UpperLeft           0.6     0.2
+LowerRight          0.79    0.3
 
 [UniformRect]
-NParticles          300
-UpperLeft           0.0     0.1
-LowerRight          0.4     0.8
+NParticles          700
+UpperLeft           0.27    0.3
+LowerRight          0.4     0.9
 
-// NOT IMPLEMENTED FROM HERE ON
 // Per default boundaries are open
 [[Boundaries]]
 [Periodic]
-Left                0
-Right               1
+Horizontal          0.2      0.8
+//Vertical          0        1
+
+
+// THIS IS NOT IMPLEMENTED
 // A reflection reflects particles without losing momentum
 [Reflection]
 // A refelection line orthognal to origin that refelcts towards origin
-// ToOrigin         0       0.9
+ToOrigin            0       0.9
 // A reflection boundary taht excludes origin (top-left corner)
-// FromOrigin       0.2     0.2
+FromOrigin          0.2     0.2
 
+
+// THIS IS NOT IMPLEMENTED
 [[Sources]]
 [Point]
-//Pos                 0.2     0.2
-//Rate                100`
+//Pos               0.2     0.2
+//Rate              100
+
+
+// THIS IS NOT IMPLEMENTED
+// Coordinates of viewport for animation
+[[Simulation]]
+[Viewport]
+UpperLeft           0       0
+LowerRight          1       1
+`

@@ -2,7 +2,11 @@ package sim
 
 import (
 	"math"
+	"fmt"
 )
+
+//TODO: remove
+var _ = fmt.Print
 
 
 // recursively find all nearest neighbors of a particle based on position
@@ -20,14 +24,43 @@ func (particle *Particle) FindNearestNeighbours(root *Cell) {
 }
 
 // Periodic version
-// assuming particles are between x = (0, 1], y = (0, 1]
-func (particle *Particle) FindNearestNeighboursPeriodic(root *Cell) {
+// assuming particles are between x = HorPeriodic, y = VertPeriodic
+// check for min/max float -> Open Boundaries
+func (particle *Particle) FindNearestNeighboursPeriodic(root *Cell, HorPeriodic, VertPeriodic [2]float64) {
+
 	particle.NNQueueInitSentinel()
-	for i:=-1.0; i<=1; i++ {
-		for j:=-1.0; j<=1; j++ {
-			particle.findNNRec(root, Vec2{i, j})
+
+	iStart := -1
+	jStart := -1
+	iEnd := 1
+	jEnd := 1
+	deltaX := HorPeriodic[1] - HorPeriodic[0]
+	deltaY := VertPeriodic[1] - VertPeriodic[0]
+
+	if HorPeriodic[0]==-math.MaxFloat64 {
+		iStart = 0
+		iEnd = 0
+		deltaX = 0
+		if HorPeriodic[1]!=math.MaxFloat64 {
+			panic("cannot have open and periodic boundary in horizontal at same time!")
 		}
 	}
+
+	if VertPeriodic[0]==-math.MaxFloat64 {
+		jStart = 0
+		jEnd = 0
+		deltaY = 0
+		if VertPeriodic[1]!=math.MaxFloat64 {
+			panic("cannot have open and periodic boundary in vertical at same time!")
+		}
+	}
+
+	for i := iStart; i <= iEnd; i++ {
+		for j := jStart; j <= jEnd; j++ {
+			particle.findNNRec(root, Vec2{float64(i)*deltaX, float64(j)*deltaY})
+		}
+	}
+
 	// make dists use Sqrt
 	for i := range NN_SIZE {
 		particle.NNDists[i] = math.Sqrt(particle.NNDists[i])
