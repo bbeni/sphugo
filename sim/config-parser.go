@@ -19,6 +19,7 @@ import (
 	"time"
 	"strconv"
 	"math"
+	"errors"
 )
 
 // For now these Titles and Subtitles are valid
@@ -114,13 +115,33 @@ func MakeConfig() SphConfig {
 	}
 }
 
-func MakeConfigFromFile(configFilePath string) SphConfig {
-	tokens := Tokenize(configFilePath)
+func MakeConfigFromFile(configFilePath string) (error, SphConfig) {
+
 	config := MakeConfig()
-	config.updateFromTokens(tokens)
-	return config
+
+	err, tokens := Tokenize(configFilePath)
+	if err != nil {
+		return err, config
+	}
+
+	err = config.updateFromTokens(tokens)
+
+	if err != nil {
+		return err, MakeConfig() // new default config
+	}
+
+	return nil, config
 }
 
+func ConfigMakeError(token Token, msg string) error {
+	m := fmt.Sprintf("%v:%v:%v: ConfigMakeError: %v\n", *token.Fname, token.Line, token.Row, msg)
+	return errors.New(m)
+}
+
+func ConfigParseError(t Tokenizer, msg string) error {
+	m := fmt.Sprintf("%v:%v:%v: ConfigParseError: %v\n", t.fname, t.line+1, t.cursor - t.bol + 1, msg)
+	return errors.New(m)
+}
 
 type Param struct {
 	Title	 string
@@ -129,24 +150,20 @@ type Param struct {
 }
 
 // This function generates a configuration given a tokenized config file
-func (config *SphConfig) updateFromTokens(tokens []Token) {
-
-	//for _, tok := range tokens {
-	//	fmt.Println(tok)
-	//}
+func (config *SphConfig) updateFromTokens(tokens []Token) error {
 
 	var token Token
 	for len(tokens) > 0 {
 		token, tokens = tokens[0], tokens[1:]
 
 		if token.Type != title {
-			ConfigMakeError(token, fmt.Sprintf("Expected a [[Title]] but got `%v`", token.Type))
+			return ConfigMakeError(token, fmt.Sprintf("Expected a [[Title]] but got `%v`", token.Type))
 		}
 
 		titleStr := token.AsStr
 		validSubtitles, ok := validTitleSubtitles[titleStr]
 		if !ok {
-			ConfigMakeError(token, fmt.Sprintf("`%v` is not a valid title", titleStr))
+			return ConfigMakeError(token, fmt.Sprintf("`%v` is not a valid title", titleStr))
 		}
 
 		if len(tokens) == 0 {
@@ -155,12 +172,12 @@ func (config *SphConfig) updateFromTokens(tokens []Token) {
 		token, tokens = tokens[0], tokens[1:]
 
 		if token.Type != subtitle {
-			ConfigMakeError(token, fmt.Sprintf("Expected a [Subtitle] but got `%v`", token.Type))
+			return ConfigMakeError(token, fmt.Sprintf("Expected a [Subtitle] but got `%v`", token.Type))
 		}
 
 		subtitleStr := token.AsStr
 		if !inSlice(validSubtitles, subtitleStr) {
-			ConfigMakeError(token, fmt.Sprintf("`%v` is not a valid subtitle under title: `%v`. It's valid subtitles are: %v", subtitleStr, titleStr, validSubtitles))
+			return ConfigMakeError(token, fmt.Sprintf("`%v` is not a valid subtitle under title: `%v`. It's valid subtitles are: %v", subtitleStr, titleStr, validSubtitles))
 		}
 
 		if len(tokens) == 0 {
@@ -179,7 +196,7 @@ func (config *SphConfig) updateFromTokens(tokens []Token) {
 				subtitleStr = token.AsStr
 
 				if !inSlice(validSubtitles, subtitleStr) {
-					ConfigMakeError(token, fmt.Sprintf("`%v` is not a valid subtitle under title: `%v`. It's valid subtitles incude: %v", subtitleStr, titleStr, validSubtitles))
+					return ConfigMakeError(token, fmt.Sprintf("`%v` is not a valid subtitle under title: `%v`. It's valid subtitles incude: %v", subtitleStr, titleStr, validSubtitles))
 				}
 				continue
 			}
@@ -187,7 +204,7 @@ func (config *SphConfig) updateFromTokens(tokens []Token) {
 			// Here we know we should be in the variable definitions
 			// this should never happen?
 			if token.Type != integer && token.Type != float && token.Type != vec2 && token.Type != word {
-				ConfigMakeError(token, fmt.Sprintf("Expected either an int, float, vec2 or word parameter definition, but got `%v`", token.Type))
+				return ConfigMakeError(token, fmt.Sprintf("Expected either an int, float, vec2 or word parameter definition, but got `%v`", token.Type))
 			}
 
 			p := Param{titleStr, subtitleStr, token.Name}
@@ -211,7 +228,7 @@ func (config *SphConfig) updateFromTokens(tokens []Token) {
 				} else if kernel == "Wendtland" {
 					config.Kernel = Wendtland2D
 				} else {
-					ConfigMakeError(token, fmt.Sprintf("Kernel `%v` is not implemented", kernel))
+					return ConfigMakeError(token, fmt.Sprintf("Kernel `%v` is not implemented", kernel))
 				}
 
 			case Param{"Simulation", "Viewport", "UpperLeft"}:
@@ -225,7 +242,7 @@ func (config *SphConfig) updateFromTokens(tokens []Token) {
 
 				// Expect exactly these 3 Params
 				if len(tokens) < 2 {
-					ConfigMakeError(token, fmt.Sprintf("Expected 3 Params following [`%v`] but got something else or nothing.\n\tOne of each paramas `NParticles, UpperLeft, LowerRight` must be defined", subtitleStr, ))
+					return ConfigMakeError(token, fmt.Sprintf("Expected 3 Params following [`%v`] but got something else or nothing.\n\tOne of each paramas `NParticles, UpperLeft, LowerRight` must be defined", subtitleStr, ))
 				}
 
 				startSpawner := UniformRectSpawner{}
@@ -234,11 +251,11 @@ func (config *SphConfig) updateFromTokens(tokens []Token) {
 				for i := range 3 {
 
 					if inSlice(got, token.Name) {
-						ConfigMakeError(token, fmt.Sprintf("The parameter name `%v` in [`%v`] is already set!", token.Name, subtitleStr))
+						return ConfigMakeError(token, fmt.Sprintf("The parameter name `%v` in [`%v`] is already set!", token.Name, subtitleStr))
 					}
 
 					if token.Type != integer && token.Type != vec2 {
-						ConfigMakeError(token, fmt.Sprintf("Expected either an integer or vec2 parameter definition in [`%v`], but got `%v`", subtitleStr, token.Type))
+						return ConfigMakeError(token, fmt.Sprintf("Expected either an integer or vec2 parameter definition in [`%v`], but got `%v`", subtitleStr, token.Type))
 					}
 
 					switch token.Name {
@@ -249,7 +266,7 @@ func (config *SphConfig) updateFromTokens(tokens []Token) {
 						case "LowerRight":
 							startSpawner.LowerRight = checkVec2(token, p)
 						default:
-							ConfigMakeError(token, fmt.Sprintf("The parameter name `%v` in [`%v`] is not valid. Needs to be one of `NParticles, UpperLeft, LowerRight`", token.Name, subtitleStr))
+							return ConfigMakeError(token, fmt.Sprintf("The parameter name `%v` in [`%v`] is not valid. Needs to be one of `NParticles, UpperLeft, LowerRight`", token.Name, subtitleStr))
 					}
 
 					got = append(got, p.Name)
@@ -261,7 +278,7 @@ func (config *SphConfig) updateFromTokens(tokens []Token) {
 				}
 
 				if tokens[0].Type != title && tokens[0].Type != subtitle {
-					ConfigMakeError(token, fmt.Sprintf("The 4th parameter name `%v` in [`%v`] is too much. need to have `NParticles, UpperLeft and LowerRight`", token.Name, subtitleStr))
+					return ConfigMakeError(token, fmt.Sprintf("The 4th parameter name `%v` in [`%v`] is too much. need to have `NParticles, UpperLeft and LowerRight`", token.Name, subtitleStr))
 				}
 
 				config.Start = append(config.Start, startSpawner)
@@ -290,10 +307,12 @@ func (config *SphConfig) updateFromTokens(tokens []Token) {
 			case Param{"Sources", "Point", "Rate"}:
 				panic("TOOD: implement [Point]")
 			default:
-				ConfigMakeError(token, fmt.Sprintf("`%v` is not a valid parameter in `[[%v]]` - `[%v]`", token.Name, titleStr, subtitleStr ))
+				return ConfigMakeError(token, fmt.Sprintf("`%v` is not a valid parameter in `[[%v]]` - `[%v]`", token.Name, titleStr, subtitleStr ))
 			}
 		}
 	}
+
+	return nil
 }
 
 func checkInt(t Token, p Param) int {
@@ -318,11 +337,6 @@ func checkVec2(t Token, p Param) Vec2 {
 		ConfigMakeError(t, fmt.Sprintf("expected an integer but got something else"))
 	}
 	return t.AsVec2
-}
-
-func ConfigMakeError(token Token, msg string) {
-	fmt.Printf("%v:%v:%v: ConfigMakeError: %v\n", *token.Fname, token.Line, token.Row, msg)
-	os.Exit(1)
 }
 
 //go:generate stringer -type TokenType
@@ -352,8 +366,8 @@ type Token struct {
 	Fname	*string
 }
 
-func Tokenize(fname string) []Token {
-	t	  := MakeTokenizer(fname)
+func Tokenize(fname string) (error, []Token) {
+	t	   := MakeTokenizer(fname)
 	tokens := make([]Token, 0)
 
 	for {
@@ -363,7 +377,11 @@ func Tokenize(fname string) []Token {
 		}
 		if t.isExactly('/') {
 			t.chop(1)
-			t.expect('/')
+			err := t.expect('/')
+			if err != nil {
+				return err, tokens
+			}
+
 			t.chop(1)
 			t.chopUntilIsNoFail(aNewline)
 			if len(t.text) == 0 {
@@ -375,38 +393,64 @@ func Tokenize(fname string) []Token {
 
 			if t.is(aLetter) {
 				startRow := t.cursor - t.bol + 1
-				content := t.chopUntilIs(notALetter, "expected a letter or `]`")
-				if len(content) == 0 {
-					fmt.Printf("%v:%v:%v: Expected a letter after `[` but got `%v` \n", t.fname, t.line+1, t.cursor - t.bol + 1, string(t.text[0]))
-					os.Exit(1)
+				err, content := t.chopUntilIs(notALetter, "expected a letter or `]`")
+				if err != nil {
+					return err, tokens
 				}
-				t.expect(']')
+
+				if len(content) == 0 {
+					msg := fmt.Sprintf("Expected a letter after `[` but got `%v` \n", string(t.text[0]))
+					return ConfigParseError(t, msg), tokens
+				}
+
+				err = t.expect(']')
+				if err != nil {
+					return err, tokens
+				}
 				t.chop(1)
+
 				t.expectIs(unicode.IsSpace, "a space or newline after `]`")
-				//fmt.Println("Title:", string(content))
 				tokens = append(tokens, Token{Type: subtitle, AsStr: string(content), Line: t.line+1, Row: startRow, Fname:&fname})
 			} else if t.isExactly('[') {
 				t.chop(1)
 				startRow := t.cursor - t.bol + 1
-				content := t.chopUntilIs(notALetter, "expected a letter or `]]`")
-				if len(content) == 0 {
-					fmt.Printf("%v:%v:%v: Expected a letter after `[[` but got `%v` \n", t.fname, t.line+1, t.cursor - t.bol + 1, string(t.text[0]))
-					os.Exit(1)
+				err, content := t.chopUntilIs(notALetter, "expected a letter or `]]`")
+
+				if err != nil {
+					return err, tokens
 				}
-				t.expect(']')
+
+				if len(content) == 0 {
+					msg := fmt.Sprintf("Expected a letter after `[[` but got `%v`", string(t.text[0]))
+					return ConfigParseError(t, msg), tokens
+				}
+
+				err = t.expect(']')
+				if err != nil {
+					return err, tokens
+				}
 				t.chop(1)
-				t.expect(']')
+
+				err = t.expect(']')
+				if err != nil {
+					return err, tokens
+				}
 				t.chop(1)
+
 				t.expectIs(unicode.IsSpace, "a space or newline after `]]`")
-				//fmt.Println("Title:", string(content))
 				tokens = append(tokens, Token{Type: title, AsStr: string(content), Line: t.line+1, Row: startRow, Fname:&fname})
 			} else {
-				fmt.Printf("%v:%v:%v: Expected a Title starting with `[[` or a Subtitle starting with `[` and then at least one letter\n", t.fname, t.line+1, t.cursor - t.bol + 1)
-				os.Exit(1)
+				msg := fmt.Sprintf("Expected a Title starting with `[[` or a Subtitle starting with `[` and then at least one letter")
+				return ConfigParseError(t, msg), tokens
 			}
 
 		} else if t.is(aLetter) {
-			varName := string(t.chopUntilIs(notALetter, "a letter as start of a parmeter name"))
+			err, chopped := t.chopUntilIs(notALetter, "a letter as start of a parmeter name")
+			if err != nil {
+				return err, tokens
+			}
+
+			varName := string(chopped)
 			startRow := t.cursor - t.bol + 1
 			t.expectIs(aWhitespace, "a whitepsace")
 			t.trimLeft()
@@ -441,7 +485,10 @@ func Tokenize(fname string) []Token {
 					if len(t.text) != 0 && t.text[0] == '.' {
 						//got float
 						t.chop(1)
-						rightPart := t.chopUntilIs(notADigit, "that there is no digit here")
+						err, rightPart := t.chopUntilIs(notADigit, "that there is no digit here")
+						if err != nil {
+							return err, tokens
+						}
 						t.expectIs(unicode.IsSpace, "a whitespace or newline")
 						toParse = append(toParse, string(leftPart) + "." + string(rightPart))
 						isThereAFloat = true
@@ -449,18 +496,18 @@ func Tokenize(fname string) []Token {
 						//got int
 						toParse = append(toParse, string(leftPart))
 					} else {
-						fmt.Printf("%v:%v:%v: In number literal expected a `.` or a digit \n", t.fname, t.line+1, t.cursor - t.bol + 1)
-						os.Exit(1)
+						msg := fmt.Sprintf("In number literal expected a `.` or a digit")
+						return ConfigParseError(t, msg), tokens
 					}
 					nNumbersFound += 1
 					if nNumbersFound > 2 {
-						fmt.Printf("%v:%v:%v: Cannot parse a Vector with more than 2 dimensions \n", t.fname, t.line+1, t.cursor - t.bol + 1)
-						os.Exit(1)
+						msg := fmt.Sprintf("Cannot parse a Vector with more than 2 dimensions")
+						return ConfigParseError(t, msg), tokens
 					}
 				}
 				if nNumbersFound == 0 {
-					fmt.Printf("%v:%v:%v: Expected at least one numbere here \n", t.fname, t.line+1, t.cursor - t.bol + 1)
-					os.Exit(1)
+					msg := fmt.Sprintf("Expected at least one number here")
+					return ConfigParseError(t, msg), tokens
 				}
 
 
@@ -494,18 +541,16 @@ func Tokenize(fname string) []Token {
 			} else if t.is(aLetter) { // parse a word
 				supposedWord := string(t.chopUntilIsNoFail(notALetter))
 				if len(supposedWord) == 0 || !t.is(unicode.IsSpace) {
-					fmt.Printf("%v:%v:%v: `%v` Excpected only Letters and a whitespace at the end to form a Word\n", t.fname, t.line+1, t.cursor - t.bol + 1, string(supposedWord))
-					os.Exit(1)
+					msg := fmt.Sprintf("`%v` Excpected only Letters and a whitespace at the end to form a Word", string(supposedWord))
+					return ConfigParseError(t, msg), tokens
 				}
 
 				tokens = append(tokens, Token{Name: varName, Type: word, AsStr: supposedWord, Line: t.line+1, Row: startRow, Fname: &fname})
 
 			} else {
-				fmt.Printf("%v:%v:%v: `%v` Excpected a Number/Vec2 or Word\n", t.fname, t.line+1, t.cursor - t.bol + 1, varName)
-				os.Exit(1)
+				msg := fmt.Sprintf("`%v` Excpected a Number/Vec2 or Word", varName)
+				return ConfigParseError(t, msg), tokens
 			}
-
-
 
 		} else {
 			fmt.Println(tokens)
@@ -513,7 +558,7 @@ func Tokenize(fname string) []Token {
 		}
 	}
 
-	return tokens
+	return nil, tokens
 }
 
 
@@ -608,17 +653,17 @@ func (t *Tokenizer) chop(n int) {
 
 }
 
-func (t *Tokenizer) chopUntilIs(pred func(r rune) bool, expectationMsg string) []rune {
+func (t *Tokenizer) chopUntilIs(pred func(r rune) bool, expectationMsg string) (error, []rune) {
 	i 	 := 0
 	text := t.text
 	for ;len(t.text) > 0 && !pred(t.text[0]); i++ {
 		t.chop(1)
 	}
 	if len(t.text) == 0 {
-		fmt.Printf("%v:%v:%v: Expected %v, but got to the end of the file \n", t.fname, t.line+1, t.cursor - t.bol + 1, expectationMsg)
-		os.Exit(1)
+		msg := fmt.Sprintf("Expected %v, but got to the end of the file", expectationMsg)
+		return ConfigParseError(*t, msg), []rune{}
 	}
-	return text[:i]
+	return nil, text[:i]
 }
 
 func (t *Tokenizer) chopUntilIsNoFail(pred func(r rune) bool) ([]rune) {
@@ -626,19 +671,6 @@ func (t *Tokenizer) chopUntilIsNoFail(pred func(r rune) bool) ([]rune) {
 	text := t.text
 	for ;len(t.text) > 0 && !pred(t.text[0]); i++ {
 		t.chop(1)
-	}
-	return text[:i]
-}
-
-func (t *Tokenizer) chopUntilExactly(r rune) []rune {
-	i 	 := 0
-	text := t.text
-	for ;len(t.text) > 0 && r != t.text[0]; i++ {
-		t.chop(1)
-	}
-	if len(t.text) == 0 {
-		fmt.Printf("%v:%v:%v: Expected `%v`, but got to the end of the file \n", t.fname, t.line+1, t.cursor - t.bol + 1, string(r))
-		os.Exit(1)
 	}
 	return text[:i]
 }
@@ -669,26 +701,28 @@ func (t *Tokenizer) isExactly(r rune) bool {
 	return t.text[0] == r
 }
 
-func (t *Tokenizer) expect(r rune) {
+func (t *Tokenizer) expect(r rune) error {
 	if len(t.text) == 0 {
 		panic("expect: no more tokenz (should not happen!)")
 	}
 
 	if r != t.text[0] {
-		fmt.Printf("%v:%v:%v: Expected `%v`, but we got this: `%v`\n", t.fname, t.line+1, t.cursor - t.bol + 1, string(r), string(t.text[0]))
-		os.Exit(1)
+		msg := fmt.Sprintf("Expected `%v`, but we got this: `%v`", string(r), string(t.text[0]))
+		return ConfigParseError(*t, msg)
 	}
+	return nil
 }
 
-func (t *Tokenizer) expectIs(pred func(rune) bool, expectationMsg string) {
+func (t *Tokenizer) expectIs(pred func(rune) bool, expectationMsg string) error {
 	if len(t.text) == 0 {
 		panic("expect: no more tokenz (should not happen!)")
 	}
 
 	if !pred(t.text[0]) {
-		fmt.Printf("%v:%v:%v: Expected %v \n", t.fname, t.line+1, t.cursor - t.bol + 1, expectationMsg)
-		os.Exit(1)
+		msg := fmt.Sprintf("Expected `%v`", expectationMsg)
+		return ConfigParseError(*t, msg)
 	}
+	return nil
 }
 
 func inSlice(list []string, a string) bool {

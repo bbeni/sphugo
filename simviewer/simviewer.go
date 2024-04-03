@@ -30,13 +30,15 @@ var _ = fmt.Println
 var _ = log.Print
 
 const (
-	PANEL_W    = 330
+	PANEL_W    = 445
 	RENDERER_W = 1280
 	RENDERER_H = 720
 
 	TEXT_SIZE  = 24
-	BTN_H 	   = 64
+	BTN_H 	   = 56
 	MARGIN_BOT = 4
+
+	TERM_TEXT_SIZE = 18
 
 	OPTION_H   = 64
 	OPTION_PAD = 4
@@ -59,7 +61,11 @@ type Theme struct {
 
 	OptionText	   color.RGBA
 	OptionUp	   color.RGBA
-	OptionHover   color.RGBA
+	OptionHover	   color.RGBA
+
+	TermBackground  color.RGBA
+	ErrorRed		color.RGBA
+	SuccessGreen	color.RGBA
 
 	SeekerBackground color.RGBA
 	SeekerFrame		 color.RGBA
@@ -70,6 +76,7 @@ type Theme struct {
 	ProfilerCursor     color.RGBA
 
 	FontFace	   font.Face
+	FontFaceTerm   font.Face
 }
 
 func run() {
@@ -92,6 +99,19 @@ func run() {
 		})
 	}
 
+	var fontFaceTerm font.Face
+	{
+		font, err := truetype.Parse(gomono.TTF)
+		if err != nil {
+			panic(err)
+		}
+
+		fontFaceTerm = truetype.NewFace(font, &truetype.Options{
+			Size: TERM_TEXT_SIZE,
+		})
+	}
+
+
 	colorTheme := &Theme{
 		Background:  	 	color.RGBA{24,   24,  24, 255},
 
@@ -100,6 +120,9 @@ func run() {
 		ButtonHover:	 	color.RGBA{45,   45,  45, 255},
 		ButtonBlink:	 	color.RGBA{70,   70,  70, 255},
 
+		TermBackground:	    color.RGBA{36,   23,   36, 255},
+		ErrorRed:			color.RGBA{220,  60,   50, 255},
+		SuccessGreen:		color.RGBA{60,   220,  23, 255},
 
 		OptionText: 	    color.RGBA{36,   33,  36, 255}, // Raisin Black
 		OptionUp:    		color.RGBA{255, 250, 240, 255}, // Floral White
@@ -114,6 +137,7 @@ func run() {
 		ProfilerCursor:     color.RGBA{48,   48,  48, 255},
 
 		FontFace:		  fontFace,
+		FontFaceTerm:	  fontFaceTerm,
 	}
 
 	w, err := win.New(win.Title("SFUGO - Simulation Renderer"), win.Size(W, H))
@@ -128,14 +152,6 @@ func run() {
 		return r
 	}
 
-
-	// create example config file if not existent
-	exampleConfigFilePath := "./example.sph-config"
-	sim.GenerateDefaultConfigFile(exampleConfigFilePath)
-
-	simulation := sim.MakeSimulationFromConfig(exampleConfigFilePath)
-	animator   := sim.MakeAnimator(&simulation)
-
 	// TODO: cleanup this mess, too many channels and/or missleading names!
 	simulationToggle := make(chan bool) // if false is sent it turns it off
 	animationToggle  := make(chan bool) // if false is sent it turns it off
@@ -146,11 +162,30 @@ func run() {
 	energyProfiler   := make(chan float64)
 	energyProfilerReset := make(chan bool)
 	drawOnce		 := make(chan bool)
+	msgStream		 := make(chan string)
 
 	mux, env := gui.NewMux(w)
 
 
-	// Background processes
+	go Terminal(mux.MakeEnv(),
+		image.Rect(W - PANEL_W, RENDERER_H, W, H),
+		colorTheme, &fontMu, msgStream)
+
+
+	// create example config file if not existent
+	exampleConfigFilePath := "example.sph-config"
+	sim.GenerateDefaultConfigFile(exampleConfigFilePath)
+
+	err, simulation := sim.MakeSimulationFromConfig(exampleConfigFilePath)
+	if err != nil {
+		msgStream <- fmt.Sprintf("%v", err)
+	} else {
+		msgStream <- fmt.Sprintf("!loaded `%v` sucessfully  (Hint: it's in the same directory as this program!) ", exampleConfigFilePath)
+	}
+
+	animator   := sim.MakeAnimator(&simulation)
+
+	// Background/Gui processes
 	{
 		go Simulator(mux.MakeEnv(),
 			simulationToggle,
@@ -170,13 +205,14 @@ func run() {
 		go DataViewer(mux.MakeEnv(),
 			framesChanged, seekerChanged2, energyProfiler, energyProfilerReset,
 			image.Rect(0, RENDERER_H + SEEKER_H, RENDERER_W, RENDERER_H+SEEKER_H+BOT_PANEL_H), colorTheme, &simulation)
-
 	}
 
-	// Gui Elements
+
+	// Button Elements
 	{
 		xa := W - PANEL_W
 		xb := W
+
 		go Button(mux.MakeEnv(), "Run/Stop Simulation", colorTheme,
 			image.Rect(xa, 0, xb, BTN_H),
 			&fontMu, func() {
@@ -207,11 +243,16 @@ func run() {
 		go Button(mux.MakeEnv(), "Load Configuration", colorTheme,
 			image.Rect(xa, 4*(BTN_H+MARGIN_BOT), xb, 4*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu,
 			func() {
-				go ConfigChoser(mux.MakeEnv(), "./", image.Rect(xa, 5*(BTN_H+MARGIN_BOT), xb, H), colorTheme, &fontMu,
+				go ConfigChoser(mux.MakeEnv(), "./", image.Rect(xa, 5*(BTN_H+MARGIN_BOT), xb, RENDERER_H), colorTheme, &fontMu,
 					func(configPath string) {
 						simulationToggle <- false
 						animationToggle <- false
-						simulation = sim.MakeSimulationFromConfig(configPath)
+						err, simulation = sim.MakeSimulationFromConfig(configPath)
+						if err != nil {
+							msgStream <- fmt.Sprintf("%v", err)
+						} else {
+							msgStream <- fmt.Sprintf("!loaded `%v` sucessfully!", configPath)
+						}
 						animator   = sim.MakeAnimator(&simulation)
 						drawOnce <- true
 						energyProfilerReset <- true
@@ -221,7 +262,6 @@ func run() {
 				})
 		})
 	}
-
 
 	// we use the master env now, w is used by the mux
 	for event := range env.Events() {
@@ -639,6 +679,45 @@ func ConfigChoser(env gui.Env, configFolder string,
 	close(env.Draw())
 }
 
+func Terminal(env gui.Env, r image.Rectangle, colorTheme *Theme, mu *sync.Mutex, messageStream <-chan string) {
+
+	redraw := func(msg string, sucess bool) func(drw draw.Image) image.Rectangle {
+		return func(drw draw.Image) image.Rectangle {
+			bg  := image.NewUniform(colorTheme.TermBackground)
+			draw.Draw(drw, r, bg, image.ZP, draw.Src)
+
+			textColor := colorTheme.ErrorRed
+			if sucess {
+				textColor = colorTheme.SuccessGreen
+			}
+
+			textImage := RenderTextMulti(msg, textColor, colorTheme.TermBackground, colorTheme.FontFaceTerm, r.Dx())
+			textRect := r
+			draw.Draw(drw, textRect, textImage, textImage.Bounds().Min, draw.Src)
+			return r
+		}
+	}
+
+
+	for {
+		select {
+		case msg := <-messageStream:
+			fmt.Println(msg)
+			if rune(msg[0]) == '!' {
+				env.Draw() <- redraw(msg[1:], true)
+			} else {
+				env.Draw() <- redraw(msg, false)
+			}
+		case _ = <-env.Events():
+			//fmt.Println(event)
+		default:
+			time.Sleep(time.Second/60)
+		}
+	}
+
+}
+
+
 func RenderText(text string, textColor, btnColor color.RGBA, fontFace font.Face) (draw.Image) {
 
 	drawer := &font.Drawer{
@@ -661,6 +740,62 @@ func RenderText(text string, textColor, btnColor color.RGBA, fontFace font.Face)
 	drawer.DrawString(text)
 	return drawer.Dst
 }
+
+func RenderTextMulti(text string, textColor, bgColor color.RGBA, fontFace font.Face, maxWidth int) (draw.Image) {
+
+
+	drawer := &font.Drawer{
+		Src:  &image.Uniform{textColor},
+		Face: fontFace,
+		Dot:  fixed.P(0, 0),
+	}
+
+	lines := make([]string, 0)
+
+	j := 0
+	i := 0
+	for i = 0; i < len(text) - 1; i++ {
+		b26_6, _ := drawer.BoundString(text[j:i+1])
+		if b26_6.Max.X.Ceil() - b26_6.Min.X.Floor() > maxWidth {
+			lines = append(lines, text[j:i])
+			j = i
+		}
+	}
+
+	if i != j {
+		lines = append(lines, text[j:i])
+	}
+
+	maxW  := 0
+	lineH := 0
+	for _, line := range lines {
+		b26_6, _ := drawer.BoundString(line)
+		bounds := image.Rect(
+			b26_6.Min.X.Floor(),
+			b26_6.Min.Y.Floor(),
+			b26_6.Max.X.Ceil(),
+			b26_6.Max.Y.Ceil(),
+		)
+		if bounds.Dx() > maxW {
+			maxW = bounds.Dx()
+		}
+		if bounds.Dy() > lineH {
+			lineH = bounds.Dy()
+		}
+	}
+
+	bounds := image.Rect(0, 0, maxW, (len(lines)+1)*lineH)
+	result := image.NewRGBA(bounds)
+	bgUniform := image.NewUniform(bgColor)
+	draw.Draw(result, bounds, bgUniform, image.ZP, draw.Src)
+
+	for i, line := range lines {
+		tImage := RenderText(line, textColor, bgColor, fontFace)
+		draw.Draw(result, bounds, tImage, bounds.Min.Sub(image.Pt(0, lineH*(i+1))), draw.Src)
+	}
+	return result
+}
+
 
 
 func Button(env gui.Env, text string, colorTheme *Theme,

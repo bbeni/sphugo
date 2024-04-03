@@ -34,10 +34,13 @@ func MakeSimulation() (Simulation){
 	return sim
 }
 
-func MakeSimulationFromConfig(configFilePath string) (Simulation) {
-	conf:= MakeConfigFromFile(configFilePath)
+func MakeSimulationFromConfig(configFilePath string) (error, Simulation) {
+	err, conf:= MakeConfigFromFile(configFilePath)
+	if err != nil {
+		return err, MakeSimulation()
+	}
 	sim := MakeSimulationFromConf(conf)
-	return sim
+	return nil, sim
 }
 
 func MakeSimulationFromConf(conf SphConfig) (Simulation){
@@ -55,7 +58,6 @@ func MakeSimulationFromConf(conf SphConfig) (Simulation){
 	sim.Root = MakeCells(sim.Particles, Vertical)
 
 	return sim
-
 }
 
 func (sim *Simulation) Run() {
