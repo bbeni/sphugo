@@ -12,17 +12,18 @@ import (
 	"os"
 	"strings"
 
-	"github.com/faiface/gui"
-	"github.com/faiface/gui/win"
-	"github.com/faiface/mainthread"
+	"github.com/bbeni/sphugo/sim"
 
+	"github.com/bbeni/guiGL"
+	"github.com/bbeni/guiGL/win"
+
+	"github.com/faiface/mainthread"
 	"github.com/golang/freetype/truetype"
 
 	"golang.org/x/image/font/gofont/gomono"
 	"golang.org/x/image/font"
 	"golang.org/x/image/math/fixed"
 
-	"github.com/bbeni/sphugo/sim"
 )
 
 // TODO: remove later
@@ -187,9 +188,8 @@ func run() {
 
 	// Background/Gui processes
 	{
-		go Simulator(mux.MakeEnv(),
-			simulationToggle,
-			framesChanged, energyProfiler, energyProfilerReset,
+		go Simulator( simulationToggle,
+			framesChanged, energyProfiler,
 			&simulation, &animator)
 
 		go Renderer(mux.MakeEnv(),
@@ -203,7 +203,7 @@ func run() {
 			image.Rect(0, RENDERER_H, RENDERER_W, RENDERER_H+SEEKER_H), colorTheme)
 
 		go DataViewer(mux.MakeEnv(),
-			framesChanged, seekerChanged2, energyProfiler, energyProfilerReset,
+			seekerChanged2, energyProfiler, energyProfilerReset,
 			image.Rect(0, RENDERER_H + SEEKER_H, RENDERER_W, RENDERER_H+SEEKER_H+BOT_PANEL_H), colorTheme, &simulation)
 	}
 
@@ -283,9 +283,9 @@ func run() {
 
 
 // Background Process for starting/stopping simulation
-func Simulator(env gui.Env,
-	simToggle <-chan bool,            					 			  // input
-	framesChanged chan<- int, energyProfiler chan<- float64, energyProfilerReset chan<- bool, // output
+func Simulator(
+	simToggle <-chan bool,                                   // input
+	framesChanged chan<- int, energyProfiler chan<- float64, // output
 	simulation *sim.Simulation, animator *sim.Animator) {
 
 	running := false
@@ -515,7 +515,7 @@ func Renderer(env gui.Env,
 }
 
 func DataViewer(env gui.Env,
-	framesCh <-chan int, seekerChanged <-chan int, energyProfiler <-chan float64, energyProfilerReset <-chan bool,// input
+    seekerChanged <-chan int, energyProfiler <-chan float64, energyProfilerReset <-chan bool,// input
 	r image.Rectangle, colorTheme *Theme, simulation *sim.Simulation) {
 
 	redraw := func(energies []float64, cursorPos int) func(drw draw.Image) image.Rectangle {
