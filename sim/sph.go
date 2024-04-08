@@ -75,6 +75,23 @@ func (sim *Simulation) Step() {
 	// constants
 	dtHalf := sim.Config.DeltaTHalf
 
+	// sources spawn particles
+	{
+		t := float64(sim.CurrentStep) * dtHalf * 2
+
+		i := -1
+		for i = range sim.Config.Sources {
+			spwn := &sim.Config.Sources[i]
+			newParticles := (*spwn).Spawn(t)
+			sim.Particles = append(sim.Particles, newParticles...)
+		}
+
+		if i != -1 {
+			sim.Root = MakeCells(sim.Particles, Vertical)
+		}
+
+	}
+
 	// step 0 of SPH needs special work done before real step is done
 	if sim.CurrentStep == 0 {
 
@@ -84,9 +101,9 @@ func (sim *Simulation) Step() {
 		}
 
 		// initialization drift dt=0
-		for _, p := range sim.Root.Particles {
-			p.VPred = p.Vel
-			p.EPred = p.E
+		for i, p := range sim.Root.Particles {
+			sim.Root.Particles[i].VPred = p.Vel
+			sim.Root.Particles[i].EPred = p.E
 		}
 
 		sim.CalculateForces()
@@ -124,18 +141,34 @@ func (sim *Simulation) Step() {
 			p.Pos   = p.Pos.Add(&vdt)
 		}
 
-		// Boundary: particles outside boundary get moved back
+		// Boundary: particles outside boundary get moved around
+		//  x1              x2
+		// x
+		// x ->   x2-x1 + x
+		//
+		//  x1              x2
+		//                     x
+		// x -> -(x1-x2) + x
+		//
+
 		for i, _ := range sim.Root.Particles {
 			p := &sim.Root.Particles[i]
 			if p.Pos.X < sim.Config.HorPeriodicity[0] {
 				p.Pos.X += (sim.Config.HorPeriodicity[1] - sim.Config.HorPeriodicity[0])
-			} else if p.Pos.X > sim.Config.HorPeriodicity[1] {
+				continue
+			}
+
+			if p.Pos.X > sim.Config.HorPeriodicity[1] {
 				p.Pos.X -= (sim.Config.HorPeriodicity[1] - sim.Config.HorPeriodicity[0])
+				continue
 			}
 
 			if p.Pos.Y < sim.Config.VertPeriodicity[0] {
 				p.Pos.Y += (sim.Config.VertPeriodicity[1] - sim.Config.VertPeriodicity[0])
-			} else if p.Pos.Y > sim.Config.VertPeriodicity[1] {
+				continue
+			}
+
+			if p.Pos.Y > sim.Config.VertPeriodicity[1] {
 				p.Pos.Y -= (sim.Config.VertPeriodicity[1] - sim.Config.VertPeriodicity[0])
 			}
 		}
@@ -143,8 +176,8 @@ func (sim *Simulation) Step() {
 		// TODO: unhardcode refelction boundaries
 		for i, _ := range sim.Root.Particles {
 			p := &sim.Root.Particles[i]
-			if p.Pos.Y > 0.97 {
-				p.Pos.Y -= p.Pos.Y - 0.97
+			if p.Pos.Y > 0.94 {
+				p.Pos.Y -= p.Pos.Y - 0.94
 				p.Vel.Y = -p.Vel.Y
 			}
 		}
@@ -290,6 +323,12 @@ func AccelerationAndEDot2D(p *Particle, sim *Simulation, kernel Kernel) {
 	var i int
 	for i = range NN_SIZE {
 		nn := p.NearestNeighbours[i]
+
+		// TODO: stupid fix because NN are nil sometimes...
+		if nn == nil {
+			break
+		}
+
 		q   = p.NNDists[i]/maxR 			// r/h in lecture
 
 		if q > 1 || q < 0 {
@@ -298,9 +337,9 @@ func AccelerationAndEDot2D(p *Particle, sim *Simulation, kernel Kernel) {
 
 		dRKernel = kernel.DF(q)
 
+
 		// PB / rhoB^2
 		contributionB = nn.C*nn.C / (gamma*nn.Rho)
-
 
 		vA := p.VPred
 		vB := nn.VPred

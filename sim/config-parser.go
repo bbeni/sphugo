@@ -40,6 +40,12 @@ type UniformRectSpawner struct {
 	NParticles int
 }
 
+type PointSource struct {
+	origin     Vec2
+	rate       float64
+	LastSpwned float64
+}
+
 // sensible defaults
 func MakeUniformRectSpawner() UniformRectSpawner{
 	return UniformRectSpawner{
@@ -73,6 +79,27 @@ func (spwn UniformRectSpawner) Spawn(t float64) []Particle {
 	return particles
 }
 
+func (spwn *PointSource) Spawn(t float64) []Particle {
+	deltaT   := t - spwn.LastSpwned
+	cooldown := 1 / spwn.rate
+
+	n := int(deltaT / cooldown)
+	spwn.LastSpwned += float64(n) * cooldown
+
+	particles := make([]Particle, n)
+	for i := range n {
+		dy := 0.01 * (-1 + 2 * rand.Float64())
+		dx := 0.01 * (-1 + 2 * rand.Float64())
+		pos := Vec2{spwn.origin.X + dx, spwn.origin.Y + dy}
+
+		particles[i].Pos = pos
+		particles[i].Rho = 100
+		particles[i].Z = rand.Int()
+		particles[i].E = 0.002
+	}
+
+	return particles
+}
 
 type Reflection struct {
 	Offset	   Vec2
@@ -207,20 +234,26 @@ func (config *SphConfig) updateFromTokens(tokens []Token) error {
 				return ConfigMakeError(token, fmt.Sprintf("Expected either an int, float, vec2 or word parameter definition, but got `%v`", token.Type))
 			}
 
+			var err error
 			p := Param{titleStr, subtitleStr, token.Name}
 
 			// TODO: check if values are set more than once
 			switch p {
 			case Param{"Simulation", "Config", "NSteps"}:
-				 config.NSteps = checkInt(token, p)
+				config.NSteps, err = checkInt(token, p)
+				if err != nil { return err }
 			case Param{"Simulation", "Config", "Gamma"}:
-				 config.Gamma  = checkFloat(token, p)
+				config.Gamma , err = checkFloat(token, p)
+				if err != nil { return err }
 			case Param{"Simulation", "Config", "ParticleMass"}:
-				 config.ParticleMass  = checkFloat(token, p)
+				config.ParticleMass, err = checkFloat(token, p)
+				if err != nil { return err }
 			case Param{"Simulation", "Config", "DeltaTHalf"}:
-				 config.DeltaTHalf   = checkFloat(token, p)
+				config.DeltaTHalf, err = checkFloat(token, p)
+				if err != nil { return err }
 			case Param{"Simulation", "Config", "Acceleration"}:
-				 config.Acceleration = checkVec2(token, p)
+				config.Acceleration, err = checkVec2(token, p)
+				if err != nil { return err }
 			case Param{"Simulation", "Config", "Kernel"}:
 				kernel := token.AsStr
 				if kernel == "Monahan" {
@@ -232,9 +265,9 @@ func (config *SphConfig) updateFromTokens(tokens []Token) error {
 				}
 
 			case Param{"Simulation", "Viewport", "UpperLeft"}:
-					 config.Viewport[0] = checkVec2(token, p)
+					 config.Viewport[0], err = checkVec2(token, p)
 			case Param{"Simulation", "Viewport", "LowerRight"}:
-					 config.Viewport[1] = checkVec2(token, p)
+					 config.Viewport[1], err = checkVec2(token, p)
 
 			case Param{"Start", "UniformRect", "NParticles"},
 			     Param{"Start", "UniformRect", "UpperLeft"},
@@ -260,11 +293,14 @@ func (config *SphConfig) updateFromTokens(tokens []Token) error {
 
 					switch token.Name {
 						case "NParticles":
-							startSpawner.NParticles = checkInt(token, p)
+							startSpawner.NParticles, err = checkInt(token, p)
+							if err != nil { return err }
 						case "UpperLeft":
-							startSpawner.UpperLeft = checkVec2(token, p)
+							startSpawner.UpperLeft, err = checkVec2(token, p)
+							if err != nil { return err }
 						case "LowerRight":
-							startSpawner.LowerRight = checkVec2(token, p)
+							startSpawner.LowerRight, err = checkVec2(token, p)
+							if err != nil { return err }
 						default:
 							return ConfigMakeError(token, fmt.Sprintf("The parameter name `%v` in [`%v`] is not valid. Needs to be one of `NParticles, UpperLeft, LowerRight`", token.Name, subtitleStr))
 					}
@@ -286,26 +322,59 @@ func (config *SphConfig) updateFromTokens(tokens []Token) error {
 
 			case Param{"Boundaries", "Periodic", "Vertical"}:
 				// TODO: make somehow sure left < right and so on
-				x := checkVec2(token, p)
+				x, err := checkVec2(token, p)
+				if err != nil { return err }
 				config.VertPeriodicity = [2]float64{x.X, x.Y}
 
 			case Param{"Boundaries", "Periodic", "Horizontal"}:
-				x := checkVec2(token, p)
+				x, err := checkVec2(token, p)
+				if err != nil { return err }
 				config.HorPeriodicity = [2]float64{x.X, x.Y}
 
 			case Param{"Boundaries", "Reflection", "ToOrigin"}:
-				x := checkVec2(token, p)
+				x, err := checkVec2(token, p)
+				if err != nil { return err }
 				config.Reflections = append(config.Reflections,
 				 	Reflection{Offset: x, FromOrigin: false,})
 			case Param{"Boundaries", "Reflection", "FromOrigin"}:
-				x := checkVec2(token, p)
+				x, err := checkVec2(token, p)
+				if err != nil { return err }
 				config.Reflections = append(config.Reflections,
 				 	Reflection{Offset: x, FromOrigin: true,})
 
-			case Param{"Sources", "Point", "Pos"}:
-				panic("TOOD: implement [Point]")
-			case Param{"Sources", "Point", "Rate"}:
-				panic("TOOD: implement [Point]")
+			case Param{"Sources", "Point", "Pos"},
+				Param{"Sources", "Point", "Rate"}:
+
+				var pos  Vec2
+				var rate float64
+				if token.Name == "Pos" {
+					pos, err = checkVec2(token, p)
+					if err != nil { return err }
+					if len(tokens) == 0 {
+						return ConfigMakeError(token, fmt.Sprintf("Expected `rate` but got nothing"))
+					}
+					token, tokens = tokens[0], tokens[1:]
+					rate, err = checkFloat(token, p)
+					if err != nil { return err }
+
+				} else {
+					rate, err = checkFloat(token, p)
+					if err != nil { return err }
+					if len(tokens) == 0 {
+						return ConfigMakeError(token, fmt.Sprintf("Expected `pos` but got nothing"))
+					}
+					token, tokens = tokens[0], tokens[1:]
+					pos, err = checkVec2(token, p)
+					if err != nil { return err }
+				}
+
+				pointSource := &PointSource{
+					rate:   rate,
+					origin: pos,
+				}
+
+				config.Sources = append(config.Sources, pointSource)
+
 			default:
 				return ConfigMakeError(token, fmt.Sprintf("`%v` is not a valid parameter in `[[%v]]` - `[%v]`", token.Name, titleStr, subtitleStr ))
 			}
@@ -315,28 +384,28 @@ func (config *SphConfig) updateFromTokens(tokens []Token) error {
 	return nil
 }
 
-func checkInt(t Token, p Param) int {
+func checkInt(t Token, p Param) (int, error) {
 	if t.Type != integer {
-		ConfigMakeError(t, fmt.Sprintf("expected an integer but got something else"))
+		return 0, ConfigMakeError(t, fmt.Sprintf("expected an integer but got something else"))
 	}
-	return int(t.AsInt)
+	return int(t.AsInt), nil
 }
 
-func checkFloat(t Token, p Param) float64 {
+func checkFloat(t Token, p Param) (float64, error) {
 	if t.Type != integer && t.Type != float  {
-		ConfigMakeError(t, fmt.Sprintf("expected an integer or float but got something else"))
+		return 0, ConfigMakeError(t, fmt.Sprintf("expected an integer or float but got something else"))
 	}
 	if t.Type == integer {
-		return float64(t.AsInt)
+		return float64(t.AsInt), nil
 	}
-	return t.AsFloat
+	return t.AsFloat, nil
 }
 
-func checkVec2(t Token, p Param) Vec2 {
+func checkVec2(t Token, p Param) (Vec2, error) {
 	if t.Type != vec2 {
-		ConfigMakeError(t, fmt.Sprintf("expected an integer but got something else"))
+		return Vec2{}, ConfigMakeError(t, fmt.Sprintf("expected an integer but got something else"))
 	}
-	return t.AsVec2
+	return t.AsVec2, nil
 }
 
 //go:generate stringer -type TokenType
@@ -460,14 +529,15 @@ func Tokenize(fname string) (error, []Token) {
 				nNumbersFound := 0
 				isThereAFloat := false
 
-				negative := false
-				if t.isExactly('-') {
-					negative = true
-					t.chop(1)
-				}
-
 				for {
 					t.trimLeft()
+
+					negative := false
+					if t.isExactly('-') {
+						negative = true
+						t.chop(1)
+					}
+
 					if nNumbersFound != 0 {
 						if len(t.text) == 0 || t.text[0] == '\n' {
 							break
@@ -478,7 +548,8 @@ func Tokenize(fname string) (error, []Token) {
 					leftPart := t.chopUntilIsNoFail(notADigit)
 
 					if negative {
-						x := make([]rune, 0, len(leftPart))
+						x := make([]rune, 1, len(leftPart)+1)
+						x[0] = '-'
 						leftPart = append(x, leftPart...)
 					}
 
@@ -765,8 +836,8 @@ NSteps              1000
 Gamma               4.666
 ParticleMass        1000000.0
 // A 2-D Vector just has 2 components separated by space(s)
-Acceleration        0       0.05
-DeltaTHalf          0.00424
+Acceleration        0       0.55
+DeltaTHalf          0.00324
 //Kernel		    Monahan
 Kernel				Wendtland
 
@@ -787,9 +858,8 @@ LowerRight          0.4     0.9
 // Per default boundaries are open
 [[Boundaries]]
 [Periodic]
-Horizontal          0.2      0.8
-//Vertical          0        1
-
+Horizontal           0.2       0.8
+Vertical              -100      0.95
 
 // THIS IS NOT IMPLEMENTED
 // A reflection reflects particles without losing momentum
@@ -799,13 +869,10 @@ ToOrigin            0       0.9
 // A reflection boundary taht excludes origin (top-left corner)
 FromOrigin          0.2     0.2
 
-
-// THIS IS NOT IMPLEMENTED
 [[Sources]]
 [Point]
-//Pos               0.2     0.2
-//Rate              100
-
+Pos               0.21     0.21
+Rate              10
 
 // THIS IS NOT IMPLEMENTED
 // Coordinates of viewport for animation

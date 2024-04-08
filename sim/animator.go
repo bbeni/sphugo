@@ -12,7 +12,6 @@ import (
 	//"sync"
 )
 
-
 type Animator struct {
 
 	//frames for rendering
@@ -54,6 +53,12 @@ func (ani *Animator) CurrentFrame() gfx.Canvas {
 	//
 	// order according to z-value
 	//
+
+	ani.renderingParticleArray = make([]*Particle, len(ani.Simulation.Particles))
+
+	for i, _ := range ani.Simulation.Particles {
+		ani.renderingParticleArray[i] = &ani.Simulation.Particles[i]
+	}
 
 	extractZindex := func(p *Particle) int {
 		//return int(p.Rho*100000)
