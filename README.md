@@ -156,6 +156,33 @@ Goal:
 >For each particle calculate the “top-hat” density from the 32 nearest neighbors and plot it using a colormap. We will need the density to implement SPH so it needs to be well tested. Also, make sure it can work with periodic boundary conditions! Design the program such that you can easily switch the kernel function (we will look at Monaghan and Wendtland kernels).
 >Now, calculate the density using the Monaghan kernel defined in the lecture. Plot and compare to the density you get from the “top-hat” kernel (the Monaghan result should be a little smoother).
 
+<img align="right" src="customColorMaps.png">
+
+For the visualization four color maps are introduced in the gx module: RainbowRamp, ParaRamp, HeatRamp and ToxicRamp (in this order in the picture on the right). The color maps are functions that output 256 distinct colors , based on the input going from 0 to 255.
+
+The color map picture is generated with
+
+```console 
+go run ./examples/color-ramp/
+```
+
+### Density
+
+The densities of the three kernels - Top Hat, Monahan and Wendtland - are displayed left to right. The row on top uses The ParaRamp color map (most dense: red), whereas the bottom row uses the HeatRamp (most dense: white). Wendtland and Monahan seem to produce much more detailed and structured densities compared to Top Hat.
+
+![tophat vs monahan vs wendtland](density_compare.png)
+
+To test the periodic boundary conditions two further images are generated using Top Hat density, the first upper is using the non periodic version of the density calculation and the lower one the periodic. We clearly see the peroidicity influencing the densities on the other side.
+
+![aperiodic density](density_test.png)
+![periodic density](density_test_periodic.png)
+
+The color density comparison pictures are generated with
+
+```console 
+go run ./examples/density/
+```
+
 ## Tests
 
 To run all tests (Partition(), BoundingSpheres() covered for now):
