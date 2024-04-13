@@ -172,7 +172,12 @@ The densities of the three kernels - Top Hat, Monahan and Wendtland - are displa
 
 ![tophat vs monahan vs wendtland](density_compare.png)
 
-The color density comparison picture is generated with
+To test the periodic boundary conditions two further images are generated using Top Hat density, the first upper is using the non periodic version of the density calculation and the lower one the periodic. We clearly see the peroidicity influencing the densities on the other side.
+
+![aperiodic density](density_test.png)
+![periodic density](density_test_periodic.png)
+
+The color density comparison pictures are generated with
 
 ```console 
 go run ./examples/density/
