@@ -153,10 +153,10 @@ The periodic visualization includes the bounding 'sphere' of each tree cell leaf
 
 Goal:
 
-<img align="right" src="customColorMaps.png">
-
 >For each particle calculate the “top-hat” density from the 32 nearest neighbors and plot it using a colormap. We will need the density to implement SPH so it needs to be well tested. Also, make sure it can work with periodic boundary conditions! Design the program such that you can easily switch the kernel function (we will look at Monaghan and Wendtland kernels).
 >Now, calculate the density using the Monaghan kernel defined in the lecture. Plot and compare to the density you get from the “top-hat” kernel (the Monaghan result should be a little smoother).
+
+<img align="right" src="customColorMaps.png">
 
 For the visualization four color maps are introduced in the gx module: RainbowRamp, ParaRamp, HeatRamp and ToxicRamp (in this order in the picture on the right). The color maps are functions that output 256 distinct colors , based on the input going from 0 to 255.
 
