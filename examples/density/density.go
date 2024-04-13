@@ -58,10 +58,10 @@ func main() {
 		NParticles: 200,
 	}
 
-	sph.Particles = spawner1.Spawn(0)
-	sph.Particles = append(sph.Particles, spawner2.Spawn(0)...)
+	ps := spawner1.Spawn(0)
+	ps  = append(ps, spawner2.Spawn(0)...)
 
-	sph.Root = sim.MakeCells(sph.Particles, sim.Vertical)
+	sph.Root = sim.MakeCells(ps, sim.Vertical)
 	sph.Root.Treebuild(sim.Vertical)
 	sph.Root.BoundingSpheres()
 
@@ -91,4 +91,81 @@ func main() {
 	canvas.DrawLine(gfx.Vec2i{0,   side}, gfx.Vec2i{w,   side}, gfx.WHITE)
 
 	canvas.ToPNG("density_compare.png")
+
+	periodicVisualTest()
 }
+
+func periodicVisualTest() {
+
+	kernel := sim.TopHat2D
+
+	sph := sim.Simulation {
+		Config: sim.MakeConfig(),
+	}
+
+	spawner1 := sim.UniformRectSpawner {
+		UpperLeft:  sim.Vec2{0.1, 0.1},
+		LowerRight: sim.Vec2{0.9, 0.9},
+		NParticles: 10000,
+	}
+
+	spawner2 := sim.UniformRectSpawner {
+		UpperLeft:  sim.Vec2{0.85, 0.4},
+		LowerRight: sim.Vec2{0.9, 0.9},
+		NParticles: 1200,
+	}
+
+	ps := spawner1.Spawn(0)
+	ps  = append(ps, spawner2.Spawn(0)...)
+
+
+	fname := [2]string{"density_test.png", "density_test_periodic.png"}
+	for i := 0; i < 2; i++  {
+		sph.Root = sim.MakeCells(ps, sim.Vertical)
+		sph.Root.Treebuild(sim.Vertical)
+		sph.Root.BoundingSpheres()
+
+
+		// claculate all nearest neighbours
+		if i == 0 {
+			for i, _ := range sph.Root.Particles {
+				sph.Root.Particles[i].FindNearestNeighbours(sph.Root)
+			}
+		} else {
+			for i, _ := range sph.Root.Particles {
+				sph.Root.Particles[i].FindNearestNeighboursPeriodic(sph.Root, [2]float64{0.1, 0.9}, [2]float64{0.1, 0.9})
+			}
+		}
+
+		for i, _ := range sph.Root.Particles {
+			p := &sph.Root.Particles[i]
+			p.Rho = sim.Density2D(p, &sph, kernel)
+		}
+
+		// draw it for all particles
+		canvas := gfx.NewCanvas(700, 350)
+		canvas.Clear(gfx.BLACK)
+		for _, particle := range sph.Root.Particles {
+			x := float32(particle.Pos.X) * float32(canvas.W)
+			y := float32(particle.Pos.Y) * float32(canvas.H)
+
+			colorFormula := float64(particle.Rho/32000 * 255)
+			color_index := uint8(math.Min(colorFormula, 255))
+
+			color := gfx.ToxicRamp(color_index)
+			//color := gfx.RainbowRamp(color_index)
+
+			if color_index > 255 {
+				nnRadius := float32(particle.NNDists[0])*float32(canvas.W)
+				canvas.DrawCircle(x, y, nnRadius, 2, gfx.WHITE)
+			}
+
+			canvas.DrawDisk(float32(x), float32(y), 2, color)
+		}
+
+		canvas.ToPNG(fname[i])
+	}
+
+
+}
+

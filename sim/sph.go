@@ -15,22 +15,17 @@ type Simulation struct {
 	Config SphConfig
 
 	Root *Cell // Tree structure for keeping track of spatial cells of particles
-	Particles []Particle
 	CurrentStep int
 
 	IsBusy  sync.Mutex
 }
 
 func MakeSimulation() (Simulation){
-
 	sim := Simulation {
 		Config: MakeConfig(),
 	}
-
 	spawner := MakeUniformRectSpawner()
-	sim.Particles = spawner.Spawn(0)
-	sim.Root = MakeCells(sim.Particles, Vertical)
-
+	sim.Root = MakeCells(spawner.Spawn(0), Vertical)
 	return sim
 }
 
@@ -54,9 +49,7 @@ func MakeSimulationFromConf(conf SphConfig) (Simulation){
 		ps = append(ps, startSpawner.Spawn(0)...)
 	}
 
-	sim.Particles = ps
-	sim.Root = MakeCells(sim.Particles, Vertical)
-
+	sim.Root = MakeCells(ps, Vertical)
 	return sim
 }
 
@@ -83,11 +76,11 @@ func (sim *Simulation) Step() {
 		for i = range sim.Config.Sources {
 			spwn := &sim.Config.Sources[i]
 			newParticles := (*spwn).Spawn(t)
-			sim.Particles = append(sim.Particles, newParticles...)
+			sim.Root.Particles = append(sim.Root.Particles, newParticles...)
 		}
 
 		if i != -1 {
-			sim.Root = MakeCells(sim.Particles, Vertical)
+			sim.Root = MakeCells(sim.Root.Particles, Vertical)
 		}
 
 	}
@@ -446,24 +439,24 @@ func (sim *Simulation) CalculateForces() {
 
 func (sim *Simulation) TotalEnergy() float64 {
 	tot := 0.0
-	for i := range sim.Particles {
-		tot += sim.Particles[i].E
+	for i := range sim.Root.Particles {
+		tot += sim.Root.Particles[i].E
 	}
 	return tot
 }
 
 func (sim *Simulation) TotalDensity() float64 {
 	tot := 0.0
-	for i := range sim.Particles {
-		tot += sim.Particles[i].Rho
+	for i := range sim.Root.Particles {
+		tot += sim.Root.Particles[i].Rho
 	}
 	return tot
 }
 
 func (sim *Simulation) TotalMomentum() float64 {
 	tot := 0.0
-	for i := range sim.Particles {
-		tot = sim.Particles[i].Vel.Norm()
+	for i := range sim.Root.Particles {
+		tot = sim.Root.Particles[i].Vel.Norm()
 	}
 	return tot
 }
