@@ -229,7 +229,7 @@ func (c Canvas) DrawLine(start, end Vec2i, color Color) {
 	draw_line(c.Img, start, end, color)
 }
 
-func (c Canvas) DrawRect(lowerLeft, upperRight Vec2i, color Color ) {
+func (c Canvas) DrawRect(lowerLeft, upperRight Vec2i, color Color) {
 	draw_rect(c.Img, lowerLeft.X, lowerLeft.Y, upperRight.X, upperRight.Y, color)
 }
 
@@ -239,7 +239,6 @@ func Abs(x int) int {
 	}
 	return x
 }
-
 
 func draw_line(img *image.NRGBA, a, b Vec2i, color color.NRGBA) {
 

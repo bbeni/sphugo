@@ -235,7 +235,21 @@ type Kernel struct {
 	DFPrefactor float64
 }
 
-var Monahan2D = Kernel{
+var TopHat2D = Kernel {
+	F: func(q float64) float64 {
+		return 1
+	},
+
+	FPrefactor: 1 / math.Pi,
+
+	DF: func(q float64) float64 {
+		panic("not defined. derivative is delta distribution!")
+	},
+
+	DFPrefactor: 1,
+}
+
+var Monahan2D = Kernel {
 	F: func(q float64) float64 {
 		if q < 0.5 {
 			return q*q*q - q*q + 1.0/6
@@ -261,7 +275,7 @@ var Monahan2D = Kernel{
 // 2d F  prefactor -> 4 * ..
 // 2d DF prefactor -> 8 * ..
 
-var Wendtland2D = Kernel{
+var Wendtland2D = Kernel {
 	F: func(q float64) float64 {
 		if q <= 1 {
 			return (1 - q)*(1 - q)*(1 - q)*(1 - q)*(1 + 4*q)
@@ -300,7 +314,7 @@ func Density2D(p *Particle, sim *Simulation, kernel Kernel) (float64) {
 		acc += kernel.F(x)
 	}
 
-	return kernel.FPrefactor * sim.Config.ParticleMass * acc / (maxR*maxR)
+	return kernel.FPrefactor*sim.Config.ParticleMass*acc / (maxR*maxR)
 }
 
 // - Sum [ (Pa/rhoa^2       + Pb/rhob^2     + PIab )]
@@ -393,6 +407,11 @@ func (sim *Simulation) CalculateForces() {
 
 	// claculate all nearest neighbours
 	for i, _ := range sim.Root.Particles {
+
+		// !!!
+		// TODO: is the boundary a bug? we should actually use the config values in the boundary!!!
+		// !!!
+
 		sim.Root.Particles[i].FindNearestNeighboursPeriodic(sim.Root, [2]float64{-1, 2}, [2]float64{-1, 2})
 	}
 

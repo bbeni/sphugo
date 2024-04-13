@@ -48,7 +48,7 @@ type PointSource struct {
 
 // sensible defaults
 func MakeUniformRectSpawner() UniformRectSpawner{
-	return UniformRectSpawner{
+	return UniformRectSpawner {
 		LowerRight: Vec2{1, 1},
 		NParticles: 1000,
 	}
