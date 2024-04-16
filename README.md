@@ -34,7 +34,7 @@ A png picture is generated from a tree with the MakeTreePng() function. The foll
 
 #### Treebuild visualization
 
-![](tree.png)
+![](doc/tree.png)
 
 
 ## 2. Task - Nearest Neighbours
@@ -143,11 +143,11 @@ go run ./examples/nearest-neighbours/
 
 It generates two images with 220 particles. One random particle is chosen and the 32 nearest neighbours are displayed in gree. The first picture shows the non periodic version of the particle.FindNearestNeighbours function. The tree cells are also shown in red:
 
-![](nearest_neighbours.png)
+![](doc/nearest_neighbours.png)
 
 The periodic visualization includes the bounding 'sphere' of each tree cell leaf instead of the tree cells:
 
-![](nearest_neighbours_periodic.png)
+![](doc/nearest_neighbours_periodic.png)
 
 ## 3. Task - Density Calculation
 
@@ -156,7 +156,7 @@ Goal:
 >For each particle calculate the “top-hat” density from the 32 nearest neighbors and plot it using a colormap. We will need the density to implement SPH so it needs to be well tested. Also, make sure it can work with periodic boundary conditions! Design the program such that you can easily switch the kernel function (we will look at Monaghan and Wendtland kernels).
 >Now, calculate the density using the Monaghan kernel defined in the lecture. Plot and compare to the density you get from the “top-hat” kernel (the Monaghan result should be a little smoother).
 
-<img align="right" src="customColorMaps.png">
+<img align="right" src="doc/customColorMaps.png">
 
 For the visualization four color maps are introduced in the gx module: RainbowRamp, ParaRamp, HeatRamp and ToxicRamp (in this order in the picture on the right). The color maps are functions that output 256 distinct colors , based on the input going from 0 to 255.
 
@@ -170,12 +170,12 @@ go run ./examples/color-ramp/
 
 The densities of the three kernels - Top Hat, Monahan and Wendtland - are displayed left to right. The row on top uses The ParaRamp color map (most dense: red), whereas the bottom row uses the HeatRamp (most dense: white). Wendtland and Monahan seem to produce much more detailed and structured densities compared to Top Hat.
 
-![tophat vs monahan vs wendtland](density_compare.png)
+![tophat vs monahan vs wendtland](doc/density_compare.png)
 
 To test the periodic boundary conditions two further images are generated using Top Hat density, the first upper is using the non periodic version of the density calculation and the lower one the periodic. We clearly see the peroidicity influencing the densities on the other side.
 
-![aperiodic density](density_test.png)
-![periodic density](density_test_periodic.png)
+![aperiodic density](doc/density_test.png)
+![periodic density](doc/density_test_periodic.png)
 
 The color density comparison pictures are generated with
 
