@@ -15,7 +15,7 @@ package main
 
 import (
 	"github.com/bbeni/sphugo/sim"
-	"github.com/bbeni/sphugo/gfx"
+	"github.com/bbeni/sphugo/gx"
 )
 
 func NonPeriodic() {
@@ -23,21 +23,21 @@ func NonPeriodic() {
 	root.BoundingSpheres()
 
 	w, h := 1000, 1000
-	canvas := gfx.NewCanvas(w, h)
-	canvas.Clear(gfx.BLACK)
+	canvas := gx.NewCanvas(w, h)
+	canvas.Clear(gx.BLACK)
 
-	//sim.PlotBoundingCircles(canvas, root, 1, gfx.WHITE)
+	//sim.PlotBoundingCircles(canvas, root, 1, gx.WHITE)
 	sim.PlotCells(canvas, root, 1, 1)
 
 	for _, p := range root.Particles {
 		x, y := p.Pos.X*float64(w), p.Pos.Y*float64(h)
-		canvas.DrawDisk(float32(x), float32(y), 3.4, gfx.ORANGE)
+		canvas.DrawDisk(float32(x), float32(y), 3.4, gx.ORANGE)
 	}
 
 	// pick one Particle and plot it
 	p0 := root.Particles[14]
 	x, y := p0.Pos.X*float64(w), p0.Pos.Y*float64(h)
-	canvas.DrawDisk(float32(x), float32(y), 10, gfx.GREEN)
+	canvas.DrawDisk(float32(x), float32(y), 10, gx.GREEN)
 
 
 	// Find the nearest neighbors of the picked particle and plot them
@@ -45,12 +45,12 @@ func NonPeriodic() {
 	for i := range sim.NN_SIZE {
 		pn := *p0.NearestNeighbours[i]
 		x, y := pn.Pos.X*float64(w), pn.Pos.Y*float64(h)
-		canvas.DrawDisk(float32(x), float32(y), 4.4, gfx.GREEN)
+		canvas.DrawDisk(float32(x), float32(y), 4.4, gx.GREEN)
 	}
 
 	// Draw green circle
 	radius := float32(p0.NNDists[0]*float64(w))
-	canvas.DrawCircle(float32(x), float32(y), radius, 2, gfx.GREEN)
+	canvas.DrawCircle(float32(x), float32(y), radius, 2, gx.GREEN)
 
 	canvas.ToPNG("nearest_neighbours.png")
 }
@@ -60,20 +60,20 @@ func Periodic() {
 	root.BoundingSpheres()
 
 	w, h := 1000, 1000
-	canvas := gfx.NewCanvas(w, h)
-	canvas.Clear(gfx.BLACK)
+	canvas := gx.NewCanvas(w, h)
+	canvas.Clear(gx.BLACK)
 
-	sim.PlotBoundingCircles(canvas, root, 1, gfx.WHITE)
+	sim.PlotBoundingCircles(canvas, root, 1, gx.WHITE)
 
 	for _, p := range root.Particles {
 		x, y := p.Pos.X*float64(w), p.Pos.Y*float64(h)
-		canvas.DrawDisk(float32(x), float32(y), 3.4, gfx.ORANGE)
+		canvas.DrawDisk(float32(x), float32(y), 3.4, gx.ORANGE)
 	}
 
 	// pick one Particle and plot it
 	p0 := root.Particles[14]
 	x, y := p0.Pos.X*float64(w), p0.Pos.Y*float64(h)
-	canvas.DrawDisk(float32(x), float32(y), 10, gfx.GREEN)
+	canvas.DrawDisk(float32(x), float32(y), 10, gx.GREEN)
 
 
 	// Find the nearest neighbors of the picked particle and plot them
@@ -81,7 +81,7 @@ func Periodic() {
 	for i := range sim.NN_SIZE {
 		pn := *p0.NearestNeighbours[i]
 		x, y := pn.Pos.X*float64(w), pn.Pos.Y*float64(h)
-		canvas.DrawDisk(float32(x), float32(y), 4.4, gfx.GREEN)
+		canvas.DrawDisk(float32(x), float32(y), 4.4, gx.GREEN)
 	}
 
 	// Draw green circles periodic
@@ -90,7 +90,7 @@ func Periodic() {
 			radius := float32(p0.NNDists[0]*float64(w))
 			pixel_x := float32(x) + float32(float64(w)*i)
 			pixel_y := float32(y) + float32(float64(h)*j)
-			canvas.DrawCircle(pixel_x, pixel_y, radius, 2, gfx.GREEN)
+			canvas.DrawCircle(pixel_x, pixel_y, radius, 2, gx.GREEN)
 		}
 	}
 
