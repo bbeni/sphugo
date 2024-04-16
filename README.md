@@ -6,7 +6,7 @@ Source code available at (www.github.com/bbeni/sphugo)
 
 ## Quick Start
 
-Install Go from [here](go.dev/doc/install). Then run
+Install Go from [here](https://go.dev/doc/install). Then run
 
 ```console
 go build ./simviewer/
