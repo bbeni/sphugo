@@ -3,10 +3,10 @@ package main
 import (
 	"math"
 	"github.com/bbeni/sphugo/sim"
-	"github.com/bbeni/sphugo/gfx"
+	"github.com/bbeni/sphugo/gx"
 )
 
-func calcAndDrawDensity(sph *sim.Simulation, kernel sim.Kernel, canvas *gfx.Canvas, side, positionIndex int, colorRamp func (uint8) gfx.Color) {
+func calcAndDrawDensity(sph *sim.Simulation, kernel sim.Kernel, canvas *gx.Canvas, side, positionIndex int, colorRamp func (uint8) gx.Color) {
 	// Calculate Nearest Neighbor Density Rho
 	for i, _ := range sph.Root.Particles {
 		p := &sph.Root.Particles[i]
@@ -22,15 +22,15 @@ func calcAndDrawDensity(sph *sim.Simulation, kernel sim.Kernel, canvas *gfx.Canv
 		colorFormula := float64(particle.Rho/6000 * 255)
 		color_index := uint8(math.Min(colorFormula, 255))
 
-		//color := gfx.ParaRamp(color_index)
-		//color := gfx.HeatRamp(color_index)
-		//color := gfx.ToxicRamp(color_index)
-		//color := gfx.RainbowRamp(color_index)
+		//color := gx.ParaRamp(color_index)
+		//color := gx.HeatRamp(color_index)
+		//color := gx.ToxicRamp(color_index)
+		//color := gx.RainbowRamp(color_index)
 		color   := colorRamp(color_index)
 
 		if color_index > 255 {
 			nnRadius := float32(particle.NNDists[0])*float32(canvas.W)
-			canvas.DrawCircle(x, y, nnRadius, 2, gfx.WHITE)
+			canvas.DrawCircle(x, y, nnRadius, 2, gx.WHITE)
 		}
 
 		canvas.DrawDisk(float32(x), float32(y), 4, color)
@@ -74,21 +74,21 @@ func main() {
 	w := 3 * side
 	h := 2 * side
 
-	canvas := gfx.NewCanvas(w, h)
-	canvas.Clear(gfx.BLACK)
+	canvas := gx.NewCanvas(w, h)
+	canvas.Clear(gx.BLACK)
 
-	calcAndDrawDensity(&sph, kernelT, &canvas, side, 0, gfx.HeatRamp)
-	calcAndDrawDensity(&sph, kernelM, &canvas, side, 1, gfx.HeatRamp)
-	calcAndDrawDensity(&sph, kernelW, &canvas, side, 2, gfx.HeatRamp)
+	calcAndDrawDensity(&sph, kernelT, &canvas, side, 0, gx.HeatRamp)
+	calcAndDrawDensity(&sph, kernelM, &canvas, side, 1, gx.HeatRamp)
+	calcAndDrawDensity(&sph, kernelW, &canvas, side, 2, gx.HeatRamp)
 
-	calcAndDrawDensity(&sph, kernelT, &canvas, side, 3, gfx.ParaRamp)
-	calcAndDrawDensity(&sph, kernelM, &canvas, side, 4, gfx.ParaRamp)
-	calcAndDrawDensity(&sph, kernelW, &canvas, side, 5, gfx.ParaRamp)
+	calcAndDrawDensity(&sph, kernelT, &canvas, side, 3, gx.ParaRamp)
+	calcAndDrawDensity(&sph, kernelM, &canvas, side, 4, gx.ParaRamp)
+	calcAndDrawDensity(&sph, kernelW, &canvas, side, 5, gx.ParaRamp)
 
 	 // separation lines in white
-	canvas.DrawLine(gfx.Vec2i{  side, 0}, gfx.Vec2i{  side, h}, gfx.WHITE)
-	canvas.DrawLine(gfx.Vec2i{2*side, 0}, gfx.Vec2i{2*side, h}, gfx.WHITE)
-	canvas.DrawLine(gfx.Vec2i{0,   side}, gfx.Vec2i{w,   side}, gfx.WHITE)
+	canvas.DrawLine(gx.Vec2i{  side, 0}, gx.Vec2i{  side, h}, gx.WHITE)
+	canvas.DrawLine(gx.Vec2i{2*side, 0}, gx.Vec2i{2*side, h}, gx.WHITE)
+	canvas.DrawLine(gx.Vec2i{0,   side}, gx.Vec2i{w,   side}, gx.WHITE)
 
 	canvas.ToPNG("density_compare.png")
 
@@ -143,8 +143,8 @@ func periodicVisualTest() {
 		}
 
 		// draw it for all particles
-		canvas := gfx.NewCanvas(700, 350)
-		canvas.Clear(gfx.BLACK)
+		canvas := gx.NewCanvas(700, 350)
+		canvas.Clear(gx.BLACK)
 		for _, particle := range sph.Root.Particles {
 			x := float32(particle.Pos.X) * float32(canvas.W)
 			y := float32(particle.Pos.Y) * float32(canvas.H)
@@ -152,12 +152,12 @@ func periodicVisualTest() {
 			colorFormula := float64(particle.Rho/32000 * 255)
 			color_index := uint8(math.Min(colorFormula, 255))
 
-			color := gfx.ToxicRamp(color_index)
-			//color := gfx.RainbowRamp(color_index)
+			color := gx.ToxicRamp(color_index)
+			//color := gx.RainbowRamp(color_index)
 
 			if color_index > 255 {
 				nnRadius := float32(particle.NNDists[0])*float32(canvas.W)
-				canvas.DrawCircle(x, y, nnRadius, 2, gfx.WHITE)
+				canvas.DrawCircle(x, y, nnRadius, 2, gx.WHITE)
 			}
 
 			canvas.DrawDisk(float32(x), float32(y), 2, color)

@@ -10,7 +10,7 @@ Example code:
 	canvas.DrawDisk(150,150,30,gx.RED)
 	canvas.ToPNG("test.png")
 */
-package gfx
+package gx
 
 import (
 	"os"
@@ -24,16 +24,16 @@ import (
 type Color = color.NRGBA
 
 var (
-	BLACK = color.NRGBA{R: 0, G: 0, B: 0, A: 255}
-	WHITE = color.NRGBA{R: 255, G: 255, B: 255, A: 255}
-	RED = color.NRGBA{R: 255, G: 0, B: 0, A: 255}
-	GREEN = color.NRGBA{R: 0, G: 255, B: 0, A: 255}
-	BLUE = color.NRGBA{R: 0, G: 0, B: 255, A: 255}
-	ORANGE = color.NRGBA{R: 255, G: 165, B: 0, A: 255}
+	BLACK  = color.NRGBA{R:0,   G: 0,   B: 0,   A: 255}
+	WHITE  = color.NRGBA{R:255, G: 255, B: 255, A: 255}
+	RED    = color.NRGBA{R:255, G: 0,   B: 0,   A: 255}
+	GREEN  = color.NRGBA{R:0,   G: 255, B: 0,   A: 255}
+	BLUE   = color.NRGBA{R:0,   G: 0,   B: 255, A: 255}
+	ORANGE = color.NRGBA{R:255, G: 165, B: 0,   A: 255}
 
-	SKYBLUE_PALE = color.NRGBA{204, 255, 255, 255}
+	SKYBLUE_PALE   = color.NRGBA{204, 255, 255, 255}
 	SKYBLUE_OPAQUE = color.NRGBA{128, 204, 204, 255}
-	SKYBLUE = color.NRGBA{178, 255, 255, 255}
+	SKYBLUE        = color.NRGBA{178, 255, 255, 255}
 )
 
 type Vec2i struct{

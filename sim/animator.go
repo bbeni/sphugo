@@ -10,7 +10,7 @@ import (
 	"image/png"
 	"image/draw"
 
-	"github.com/bbeni/sphugo/gfx"
+	"github.com/bbeni/sphugo/gx"
 	"github.com/go-gl/gl/v4.2-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
 	"github.com/go-gl/mathgl/mgl32"
@@ -53,7 +53,7 @@ func MakeAnimator(simulation *Simulation) Animator {
 }
 
 
-func (ani *Animator) CurrentFrame() gfx.Canvas {
+func (ani *Animator) CurrentFrame() gx.Canvas {
 	//
 	// order according to z-value
 	//
@@ -71,8 +71,8 @@ func (ani *Animator) CurrentFrame() gfx.Canvas {
 
 	QuickSort(ani.renderingParticleArray, extractZindex)
 
-	canvas := gfx.NewCanvas(1280, 720)
-	canvas.Clear(gfx.BLACK)
+	canvas := gx.NewCanvas(1280, 720)
+	canvas.Clear(gx.BLACK)
 
 	for _, particle := range ani.renderingParticleArray {
 		x := float32(particle.Pos.X) * float32(canvas.W)
@@ -87,15 +87,15 @@ func (ani *Animator) CurrentFrame() gfx.Canvas {
 		//colorFormula := float64(particle.Vel.Norm()*256)
 
 		color_index := uint8(math.Min(colorFormula, 255))
-		color := gfx.ParaRamp(color_index)
-		//color := gfx.HeatRamp(color_index)
-		//color := gfx.ToxicRamp(color_index)
-		//color := gfx.RainbowRamp(color_index)
+		color := gx.ParaRamp(color_index)
+		//color := gx.HeatRamp(color_index)
+		//color := gx.ToxicRamp(color_index)
+		//color := gx.RainbowRamp(color_index)
 
 
 		if color_index > 255 {
 			nnRadius := float32(particle.NNDists[0])*float32(canvas.W)
-			canvas.DrawCircle(x, y, nnRadius, 2, gfx.WHITE)
+			canvas.DrawCircle(x, y, nnRadius, 2, gx.WHITE)
 		}
 
 		//canvas.DrawDisk(float32(x), float32(y), zNormalized*zNormalized*20+1, color)
