@@ -111,7 +111,7 @@ func MakeCells(particles []Particle, ori Orientation) (*Cell) {
 func MakeCellsUniform(n int, orientation Orientation) (*Cell) {
 
 	particles := make([]Particle, n)
-	// TODO: shouldn't particles get initialized uniforemly here??
+	InitUniformly(particles)
 	cell := MakeCells(particles, orientation)
 
 	return cell
