@@ -4,7 +4,29 @@
 
 Source code available at (www.github.com/bbeni/sphugo)
 
-This is my attempt at the assignments of ESC 202 course at UZH written in [GO](https://go.dev/ "Go Language"). 🦆 The Goal is to have a working Smooth Particle Hydrodynamics (SPH) code. GO as a language was chosen to easily parallelize the simulation and have fast execution times comparable to C/C++. There are 5 tasks leading up to the simulation. The following sections should provide documentation of the implementation process.
+## Quick Start
+
+```console
+go build ./simviewer/
+```
+
+The resulting executable is independent of where it's run. It will generate an example.sph-config file where it's run. Configurations can be loaded in the simviewer program - they have to be in the folder it's run from. The example.sph-config can be modified using a text editor and should show what is possible, while serving as documentation.
+
+Linux/MacOs:
+
+```console
+./simviewer
+```
+
+Windows:
+
+```console
+./simviewer.exe
+```
+
+# Tasks leading to final code
+
+This ws my attempt at the assignments of ESC 202 course at UZH written in [GO](https://go.dev/ "Go Language"). 🦆 The Goal was to have a working Smooth Particle Hydrodynamics (SPH) code. GO as a language was chosen to easily parallelize the simulation and have fast execution times comparable to C/C++. There are 5 tasks leading up to the simulation. The following sections should provide documentation of the implementation process.
 
 ## 1. Task - Binary Partition 2d Particles
 
