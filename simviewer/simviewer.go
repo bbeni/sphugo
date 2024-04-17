@@ -1,34 +1,30 @@
 package main
 
 import (
-	"slices"
-	"image"
-	"image/draw"
-	"image/color"
-	"time"
-	"sync"
 	"fmt"
+	"image"
+	"image/color"
+	"image/draw"
 	"log"
 	"os"
+	"slices"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/bbeni/sphugo/sim"
-
-	"github.com/bbeni/guiGL"
-	"github.com/bbeni/guiGL/win"
-
-	"github.com/faiface/mainthread"
+	"github.com/bbeni/tomato"
 	"github.com/golang/freetype/truetype"
-
-	"golang.org/x/image/font/gofont/gomono"
 	"golang.org/x/image/font"
+	"golang.org/x/image/font/gofont/gomono"
 	"golang.org/x/image/math/fixed"
-
 )
 
 // TODO: remove later
 var _ = fmt.Println
 var _ = log.Print
+var _ = os.Exit
+var _ = strings.Split
 
 const (
 	PANEL_W    = 445
@@ -36,7 +32,7 @@ const (
 	RENDERER_H = 720
 
 	TEXT_SIZE  = 24
-	BTN_H 	   = 56
+	BTN_H      = 56
 	MARGIN_BOT = 4
 
 	TERM_TEXT_SIZE = 18
@@ -44,50 +40,48 @@ const (
 	OPTION_H   = 64
 	OPTION_PAD = 4
 
-	SEEKER_H   = 24
-	SEEKER_W   = 36
+	SEEKER_H     = 24
+	SEEKER_W     = 36
 	SEEKER_MIN_W = 8
-	SEEKER_PAD = 4
+	SEEKER_PAD   = 4
 
 	BOT_PANEL_H = 220
 )
 
 type Theme struct {
-	Background	   color.RGBA
+	Background color.RGBA
 
-	ButtonText	   color.RGBA
-	ButtonUp	   color.RGBA
-	ButtonHover	   color.RGBA
-	ButtonBlink    color.RGBA
+	ButtonText  color.RGBA
+	ButtonUp    color.RGBA
+	ButtonHover color.RGBA
+	ButtonBlink color.RGBA
 
-	OptionText	   color.RGBA
-	OptionUp	   color.RGBA
-	OptionHover	   color.RGBA
+	OptionText  color.RGBA
+	OptionUp    color.RGBA
+	OptionHover color.RGBA
 
-	TermBackground  color.RGBA
-	ErrorRed		color.RGBA
-	SuccessGreen	color.RGBA
+	TermBackground color.RGBA
+	ErrorRed       color.RGBA
+	SuccessGreen   color.RGBA
 
 	SeekerBackground color.RGBA
-	SeekerFrame		 color.RGBA
-	SeekerCursor	 color.RGBA
+	SeekerFrame      color.RGBA
+	SeekerCursor     color.RGBA
 
 	ProfilerForeground color.RGBA
 	ProfilerBackground color.RGBA
 	ProfilerCursor     color.RGBA
 
-	FontFace	   font.Face
-	FontFaceTerm   font.Face
+	FontFace     font.Face
+	FontFaceTerm font.Face
 }
 
 func run() {
 
-	W 			:= RENDERER_W + PANEL_W
-	H 	  		:= RENDERER_H + SEEKER_H + BOT_PANEL_H
-
+	W := RENDERER_W + PANEL_W
+	H := RENDERER_H + SEEKER_H + BOT_PANEL_H
 
 	var fontMu sync.Mutex
-
 	var fontFace font.Face
 	{
 		font, err := truetype.Parse(gomono.TTF)
@@ -112,66 +106,68 @@ func run() {
 		})
 	}
 
-
 	colorTheme := &Theme{
-		Background:  	 	color.RGBA{24,   24,  24, 255},
+		Background: color.RGBA{24, 24, 24, 255},
 
-		ButtonText: 	 	color.RGBA{255, 250, 240, 255}, // Floral White
-		ButtonUp:   	 	color.RGBA{36,   33,  36, 255}, // Raisin Black
-		ButtonHover:	 	color.RGBA{45,   45,  45, 255},
-		ButtonBlink:	 	color.RGBA{70,   70,  70, 255},
+		ButtonText:  color.RGBA{255, 250, 240, 255}, // Floral White
+		ButtonUp:    color.RGBA{36, 33, 36, 255},    // Raisin Black
+		ButtonHover: color.RGBA{45, 45, 45, 255},
+		ButtonBlink: color.RGBA{70, 70, 70, 255},
 
-		TermBackground:	    color.RGBA{36,   23,   36, 255},
-		ErrorRed:			color.RGBA{220,  60,   50, 255},
-		SuccessGreen:		color.RGBA{60,   220,  23, 255},
+		TermBackground: color.RGBA{36, 23, 36, 255},
+		ErrorRed:       color.RGBA{220, 60, 50, 255},
+		SuccessGreen:   color.RGBA{60, 220, 23, 255},
 
-		OptionText: 	    color.RGBA{36,   33,  36, 255}, // Raisin Black
-		OptionUp:    		color.RGBA{255, 250, 240, 255}, // Floral White
-		OptionHover:	 	color.RGBA{240, 220, 200, 255},
+		OptionText:  color.RGBA{36, 33, 36, 255},    // Raisin Black
+		OptionUp:    color.RGBA{255, 250, 240, 255}, // Floral White
+		OptionHover: color.RGBA{240, 220, 200, 255},
 
-		SeekerFrame:	 	color.RGBA{140,   0,   0, 255},
-		SeekerBackground:	color.RGBA{120,   0,  30, 255},
-		SeekerCursor:	 	color.RGBA{220,  20,  50, 255},
+		SeekerFrame:      color.RGBA{140, 0, 0, 255},
+		SeekerBackground: color.RGBA{120, 0, 30, 255},
+		SeekerCursor:     color.RGBA{220, 20, 50, 255},
 
-		ProfilerForeground: color.RGBA{10,  180,  20, 255},
-		ProfilerBackground: color.RGBA{24,   24,  24, 255},
-		ProfilerCursor:     color.RGBA{48,   48,  48, 255},
+		ProfilerForeground: color.RGBA{10, 180, 20, 255},
+		ProfilerBackground: color.RGBA{24, 24, 24, 255},
+		ProfilerCursor:     color.RGBA{48, 48, 48, 255},
 
-		FontFace:		  fontFace,
-		FontFaceTerm:	  fontFaceTerm,
+		FontFace:     fontFace,
+		FontFaceTerm: fontFaceTerm,
 	}
 
-	w, err := win.New(win.Title("SFUGO - Simulation Renderer"), win.Size(W, H))
-	if err != nil {
+	if err := tomato.Create(W, H, "SFUGO - Simulation Renderer"); err != nil {
 		panic(err)
 	}
 
-	w.Draw() <- func(drw draw.Image) image.Rectangle {
+	/*w.Draw() <- func(drw draw.Image) image.Rectangle {
 		r := image.Rect(0, 0, W, H)
 		backgroundImg := image.NewUniform(colorTheme.Background)
 		draw.Draw(drw, r, backgroundImg, image.ZP, draw.Src)
 		return r
-	}
+	}*/
 
 	// TODO: cleanup this mess, too many channels and/or missleading names!
 	simulationToggle := make(chan bool) // if false is sent it turns it off
-	animationToggle  := make(chan bool) // if false is sent it turns it off
-	framesChanged    := make(chan int)
-	cursorChanged    := make(chan int)
-	seekerChanged1   := make(chan int)
-	seekerChanged2   := make(chan int)
-	energyProfiler   := make(chan float64)
+	animationToggle := make(chan bool)  // if false is sent it turns it off
+	framesChanged := make(chan int)
+	cursorChanged := make(chan int)
+	seekerChanged1 := make(chan int)
+	seekerChanged2 := make(chan int)
+	energyProfiler := make(chan float64)
 	energyProfilerReset := make(chan bool)
-	drawOnce		 := make(chan bool)
-	msgStream		 := make(chan string)
+	drawOnce := make(chan bool)
+	msgStream := make(chan string)
 
-	mux, env := gui.NewMux(w)
+	// Event Fowarding Channels
+	// @Todo make this behind some abstraction maybe?
+	forwarding := make([]chan tomato.Ev, 5)
+	//forwarding_boxes := make([]image.Rectangle, len(forwarding))
+	for i := range forwarding {
+		forwarding[i] = make(chan tomato.Ev)
+	}
 
-
-	go Terminal(mux.MakeEnv(),
-		image.Rect(W - PANEL_W, RENDERER_H, W, H),
+	go Terminal(
+		image.Rect(W-PANEL_W, RENDERER_H, W, H),
 		colorTheme, &fontMu, msgStream)
-
 
 	// create example config file if not existent
 	exampleConfigFilePath := "example.sph-config"
@@ -184,110 +180,160 @@ func run() {
 		msgStream <- fmt.Sprintf("!loaded `%v` sucessfully  (Hint: it's in the same directory as this program!) ", exampleConfigFilePath)
 	}
 
-	animator   := sim.MakeAnimator(&simulation)
+	animator := sim.MakeAnimator(&simulation)
+	//animator   := sim.MakeAnimatorGL(&simulation)
 
 	// Background/Gui processes
 	{
-		go Simulator( simulationToggle,
+		go Simulator(
+			simulationToggle,
 			framesChanged, energyProfiler,
 			&simulation, &animator)
 
-		go Renderer(mux.MakeEnv(),
+		go Renderer(
 			animationToggle, seekerChanged1, drawOnce,
 			cursorChanged, seekerChanged2,
 			image.Rect(0, 0, RENDERER_W, RENDERER_H), &animator)
 
-		go Seeker(mux.MakeEnv(),
+		go Seeker(
+			forwarding[4],
 			framesChanged, cursorChanged,
 			seekerChanged1, seekerChanged2,
 			image.Rect(0, RENDERER_H, RENDERER_W, RENDERER_H+SEEKER_H), colorTheme)
 
-		go DataViewer(mux.MakeEnv(),
+		go DataViewer(
 			seekerChanged2, energyProfiler, energyProfilerReset,
-			image.Rect(0, RENDERER_H + SEEKER_H, RENDERER_W, RENDERER_H+SEEKER_H+BOT_PANEL_H), colorTheme, &simulation)
+			image.Rect(0, RENDERER_H+SEEKER_H, RENDERER_W, RENDERER_H+SEEKER_H+BOT_PANEL_H), colorTheme, &simulation)
 	}
-
 
 	// Button Elements
 	{
 		xa := W - PANEL_W
 		xb := W
 
-		go Button(mux.MakeEnv(), "Run/Stop Simulation", colorTheme,
-			image.Rect(xa, 0, xb, BTN_H),
+		rect0 := image.Rect(xa, 0, xb, BTN_H)
+		rect1 := image.Rect(xa, 1*(BTN_H+MARGIN_BOT), xb, 1*(BTN_H+MARGIN_BOT)+BTN_H)
+		rect2 := image.Rect(xa, 2*(BTN_H+MARGIN_BOT), xb, 2*(BTN_H+MARGIN_BOT)+BTN_H)
+		rect3 := image.Rect(xa, 3*(BTN_H+MARGIN_BOT), xb, 3*(BTN_H+MARGIN_BOT)+BTN_H)
+
+		//forwarding_boxes[0] = rect0
+		//forwarding_boxes[1] = rect1
+		//forwarding_boxes[2] = rect2
+		//forwarding_boxes[3] = rect3
+
+		go Button("Run/Stop Simulation", colorTheme,
+			forwarding[0],
+			rect0,
 			&fontMu, func() {
 				simulationToggle <- true
-		})
-		go Button(mux.MakeEnv(), "Play/Pause Animation", colorTheme,
-			image.Rect(xa, 1*(BTN_H+MARGIN_BOT), xb, 1*(BTN_H+MARGIN_BOT)+BTN_H),
+			})
+		go Button("Play/Pause Animation", colorTheme,
+			forwarding[1],
+			rect1,
 			&fontMu, func() {
 				animationToggle <- true
-		})
-		go Button(mux.MakeEnv(), "Render to .mp4", colorTheme,
-			image.Rect(xa, 2*(BTN_H+MARGIN_BOT), xb, 2*(BTN_H+MARGIN_BOT)+BTN_H),
+			})
+		go Button("Render to .mp4", colorTheme,
+			forwarding[2],
+			rect2,
 			&fontMu, func() {
 
-		})
-		go Button(mux.MakeEnv(), "Current Frame to .png", colorTheme,
-			image.Rect(xa, 3*(BTN_H+MARGIN_BOT), xb, 3*(BTN_H+MARGIN_BOT)+BTN_H),
+			})
+		go Button("Current Frame to .png", colorTheme,
+			forwarding[3],
+			rect3,
 			&fontMu, func() {
 				// TODO: fix code
 				/*
-				i := animator.ActiveFrame
-				file_path := fmt.Sprintf("frame%v.png", i)
-				animator.FrameToPNG(file_path)
-				log.Printf("Created PNG %s.", file_path)
+					i := animator.ActiveFrame
+					file_path := fmt.Sprintf("frame%v.png", i)
+					animator.FrameToPNG(file_path)
+					log.Printf("Created PNG %s.", file_path)
 				*/
-		})
+			})
 
-		go Button(mux.MakeEnv(), "Load Configuration", colorTheme,
-			image.Rect(xa, 4*(BTN_H+MARGIN_BOT), xb, 4*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu,
-			func() {
-				go ConfigChoser(mux.MakeEnv(), "./", image.Rect(xa, 5*(BTN_H+MARGIN_BOT), xb, RENDERER_H), colorTheme, &fontMu,
-					func(configPath string) {
-						simulationToggle <- false
-						animationToggle <- false
-						err, simulation = sim.MakeSimulationFromConfig(configPath)
-						if err != nil {
-							msgStream <- fmt.Sprintf("%v", err)
-						} else {
-							msgStream <- fmt.Sprintf("!loaded `%v` sucessfully!", configPath)
-						}
-						animator   = sim.MakeAnimator(&simulation)
-						drawOnce <- true
-						energyProfilerReset <- true
-						framesChanged <- 1
-						seekerChanged1 <- 0
+		/*
+			go Button("Load Configuration", colorTheme,
+				image.Rect(xa, 4*(BTN_H+MARGIN_BOT), xb, 4*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu,
+				func() {
+					go ConfigChoser("./", image.Rect(xa, 5*(BTN_H+MARGIN_BOT), xb, RENDERER_H), colorTheme, &fontMu,
+						func(configPath string) {
+							simulationToggle <- false
+							animationToggle <- false
+							err, simulation = sim.MakeSimulationFromConfig(configPath)
+							if err != nil {
+								msgStream <- fmt.Sprintf("%v", err)
+							} else {
+								msgStream <- fmt.Sprintf("!loaded `%v` sucessfully!", configPath)
+							}
 
-				})
-		})
+							seekerChanged1 <- 0
+							//animator   = sim.MakeAnimator(&simulation)
+							animator = sim.MakeAnimatorGL(&simulation)
+							env.GL() <- func() { animator.Init(W, H) }
+
+							drawOnce <- true
+							energyProfilerReset <- true
+							framesChanged <- 1
+
+					})
+			}) */
 	}
 
-	// we use the master env now, w is used by the mux
-	for event := range env.Events() {
-		switch ev := event.(type) {
-		case win.WiClose:
-			close(env.Draw())
-		case win.KbDown:
-			switch ev.Key {
-			case win.KeyEscape:
-				close(env.Draw())
-			case win.KeySpace:
-				animationToggle <- true
+	tick := 0
+
+	// main loop
+	for tomato.Alive() {
+	events_loop:
+		for {
+			select {
+			case event := <-tomato.Events():
+				switch event.Kind {
+				case tomato.KeyDown:
+					if event.Key == tomato.Escape {
+						tomato.Die()
+					}
+					if event.Key == tomato.Space {
+						animationToggle <- true
+					}
+				case tomato.MouDown,
+					tomato.MouUp,
+					tomato.MouMove:
+					// forward to ui elements
+					for i := range forwarding {
+						//if event.Point.In(btn_boxes[i]) {
+						forwarding[i] <- event
+						//}
+					}
+				}
+			default:
+				break events_loop
 			}
-		case win.KbType:
-			//fmt.Println(ev.String())
 		}
+
+		// do logic
+		//
+		// @Todo calculate more stuff here !!
+		//
+
+		//fmt.Println(tick)
+		tick++
+
+		// draw every 4th frame
+		if tick%1 == 0 {
+			tomato.Draw()
+		}
+
+		tomato.Win.SwapBuffers()
+		time.Sleep(time.Second / 120)
 	}
 }
 
-
 // Background Process for starting/stopping simulation
 func Simulator(
-	simToggle <-chan bool,                                   // input
+	simToggle <-chan bool, // input
 	framesChanged chan<- int, energyProfiler chan<- float64, // output
 	simulation *sim.Simulation, animator *sim.Animator) {
-
 	running := false
 	for {
 		select {
@@ -299,28 +345,32 @@ func Simulator(
 				running = !running
 			}
 		default:
+
 			if running {
 				simulation.Step()
 				energy := simulation.TotalEnergy()
 				//energy := simulation.TotalDensity()
 				animator.Frame()
-				framesChanged  <- len(animator.Frames)
+				//animator.AddFrame()
+
+				framesChanged <- len(animator.Frames)
+				//framesChanged  <- animator.NumberFrames()
 				energyProfiler <- energy
 			}
 		}
 	}
 }
 
-func Seeker(env gui.Env,
-	framesCh <-chan int, cursorCh <-chan int,   // input
-	seekerChanged1, seekerChanged2 chan<- int,  // output
+func Seeker(
+	events <-chan tomato.Ev,
+	framesCh <-chan int, cursorCh <-chan int, // input
+	seekerChanged1, seekerChanged2 chan<- int, // output
 	r image.Rectangle, colorTheme *Theme) {
-
 	frameCount := 0
-	cursorPos  := 0
+	cursorPos := 0
 
 	// draws the seeker at a given position
-	drawSeeker := func(frameCount, cursorPos int) func(draw.Image) image.Rectangle {
+	drawSeeker := func(frameCount, cursorPos int) draw.Image {
 
 		if cursorPos >= frameCount && frameCount != 0 {
 			panic("cursor pos higher that frame count!")
@@ -330,52 +380,58 @@ func Seeker(env gui.Env,
 			frameCount = 1
 		}
 
-		return func(drw draw.Image) image.Rectangle {
+		drw := image.NewRGBA(r)
 
-			//
-			// draw background
-			//
+		//
+		// draw background
+		//
 
-			imgUni := image.NewUniform(colorTheme.SeekerBackground)
+		imgUni := image.NewUniform(colorTheme.SeekerBackground)
+		draw.Draw(drw, r, imgUni, image.ZP, draw.Src)
+
+		//
+		// draw frame hints
+		//
+
+		imgUni = image.NewUniform(colorTheme.SeekerFrame)
+		frameRect := r
+
+		frameDx := float32(r.Dx()) / float32(frameCount)
+
+		if frameDx <= SEEKER_MIN_W {
 			draw.Draw(drw, r, imgUni, image.ZP, draw.Src)
-
-			//
-			// draw frame hints
-			//
-
-			imgUni     = image.NewUniform(colorTheme.SeekerFrame)
-			frameRect := r
-
-			frameDx := float32(r.Dx()) / float32(frameCount)
-
-			if frameDx <= SEEKER_MIN_W {
-				draw.Draw(drw, r, imgUni, image.ZP, draw.Src)
-				frameDx = float32(SEEKER_MIN_W)
-			} else {
-				for i := range frameCount {
-					frameRect.Min.X = int(frameDx * float32(i))   + SEEKER_PAD / 2
-					frameRect.Max.X = int(frameDx * float32(i+1)) - SEEKER_PAD / 2
-					draw.Draw(drw, frameRect, imgUni, image.ZP, draw.Src)
-				}
+			frameDx = float32(SEEKER_MIN_W)
+		} else {
+			for i := range frameCount {
+				frameRect.Min.X = int(frameDx*float32(i)) + SEEKER_PAD/2
+				frameRect.Max.X = int(frameDx*float32(i+1)) - SEEKER_PAD/2
+				draw.Draw(drw, frameRect, imgUni, image.ZP, draw.Src)
 			}
-
-			//
-			// draw cursor
-			//
-
-			imgUni = image.NewUniform(colorTheme.SeekerCursor)
-
-			cursorW := Min(int(frameDx), int(SEEKER_W))
-			cursorOffset := image.Point{int(frameDx/2 - float32(cursorW)/2), 0}
-			cursorRect := r
-			cursorRect.Min.X = int((float32(r.Dx()) / float32(frameCount)) * float32(cursorPos) )
-			cursorRect.Max.X = cursorRect.Min.X + cursorW
-			cursorRect = cursorRect.Add(cursorOffset)
-
-			draw.Draw(drw, cursorRect.Intersect(r), imgUni, image.ZP, draw.Src)
-			return r
 		}
+
+		//
+		// draw cursor
+		//
+
+		imgUni = image.NewUniform(colorTheme.SeekerCursor)
+
+		cursorW := Min(int(frameDx), int(SEEKER_W))
+		cursorOffset := image.Point{int(frameDx/2 - float32(cursorW)/2), 0}
+		cursorRect := r
+		cursorRect.Min.X = int((float32(r.Dx()) / float32(frameCount)) * float32(cursorPos))
+		cursorRect.Max.X = cursorRect.Min.X + cursorW
+		cursorRect = cursorRect.Add(cursorOffset)
+
+		draw.Draw(drw, cursorRect.Intersect(r), imgUni, image.ZP, draw.Src)
+		return drw
 	}
+
+	nerfedCursorPos := cursorPos
+	if cursorPos >= frameCount && frameCount != 0 {
+		nerfedCursorPos = frameCount - 1
+	}
+	seekrImg := drawSeeker(frameCount, nerfedCursorPos)
+	tomato.ToDraw(r, seekrImg)
 
 	needRedraw := true
 	pressed := false
@@ -387,35 +443,37 @@ func Seeker(env gui.Env,
 		case newPos := <-cursorCh:
 			cursorPos = newPos
 			needRedraw = true
-		case event := <-env.Events():
-			switch event := event.(type) {
-				case win.MoDown:
-					if event.Point.In(r) && frameCount != 0 {
-						cursorPos = int(float32(event.Point.X) / float32(RENDERER_W) * float32(frameCount))
+		case event := <-events:
+			switch event.Kind {
+			case tomato.MouDown:
+				if event.Point.In(r) && frameCount != 0 {
+					cursorPos = int(float32(event.Point.X) / float32(RENDERER_W) * float32(frameCount))
+					seekerChanged1 <- cursorPos
+					seekerChanged2 <- cursorPos
+					pressed = true
+					needRedraw = true
+				}
+			case tomato.MouUp:
+				pressed = false
+			case tomato.MouMove:
+				if pressed && frameCount != 0 {
+					oldCursorPos := cursorPos
+					cursorPos = int(float32(event.Point.X) / float32(RENDERER_W) * float32(frameCount))
+
+					if cursorPos >= frameCount {
+						cursorPos = frameCount - 1
+					}
+
+					if cursorPos < 0 {
+						cursorPos = 0
+					}
+
+					if oldCursorPos != cursorPos {
+						needRedraw = true
 						seekerChanged1 <- cursorPos
 						seekerChanged2 <- cursorPos
-						pressed = true
-						needRedraw = true
 					}
-				case win.MoUp:
-					pressed = false
-				case win.MoMove:
-					if pressed && frameCount != 0{
-						oldCursorPos := cursorPos
-						cursorPos = int(float32(event.Point.X) / float32(RENDERER_W) * float32(frameCount))
-						if cursorPos >= frameCount {
-							cursorPos = frameCount - 1
-						}
-						if cursorPos < 0 {
-							cursorPos = 0
-						}
-
-						if oldCursorPos != cursorPos {
-							needRedraw = true
-							seekerChanged1 <- cursorPos
-							seekerChanged2 <- cursorPos
-						}
-					}
+				}
 			}
 		}
 
@@ -424,7 +482,10 @@ func Seeker(env gui.Env,
 			if cursorPos >= frameCount && frameCount != 0 {
 				nerfedCursorPos = frameCount - 1
 			}
-			env.Draw() <- drawSeeker(frameCount, nerfedCursorPos)
+
+			seekrImg = drawSeeker(frameCount, nerfedCursorPos)
+			tomato.ToDraw(r, seekrImg)
+
 			needRedraw = false
 			time.Sleep(time.Second / 300)
 		}
@@ -432,27 +493,20 @@ func Seeker(env gui.Env,
 
 }
 
-
-func Renderer(env gui.Env,
+func Renderer(
 	aniToggle <-chan bool, seekerChanged1 <-chan int, drawOnce <-chan bool, // input
-	cursorCh chan<- int, seekerChanged2	chan<- int,                     // output
+	cursorCh chan<- int, seekerChanged2 chan<- int, // output
 	r image.Rectangle, animator *sim.Animator) {
 
-	drawFrame := func(i int) func(draw.Image) image.Rectangle {
-
+	drawFrame := func(i int) draw.Image {
+		drw := image.NewRGBA(r)
 		if i == 0 && len(animator.Frames) == 0 {
-			return func(drw draw.Image) image.Rectangle {
-				img := image.NewUniform(color.RGBA{0,0,0,255})
-				draw.Draw(drw, r, img, image.ZP, draw.Src)
-				return r
-			}
+			img := image.NewUniform(color.RGBA{0, 0, 0, 255})
+			draw.Draw(drw, r, img, image.ZP, draw.Src)
+			return drw
 		}
-
-		return func(drw draw.Image) image.Rectangle {
-			draw.Draw(drw, r, animator.Frames[i], image.ZP, draw.Src)
-			return r
-		}
-
+		draw.Draw(drw, r, animator.Frames[i], image.ZP, draw.Src)
+		return drw
 	}
 
 	needsRedraw := false
@@ -460,14 +514,18 @@ func Renderer(env gui.Env,
 	once := false
 	step := 0
 
+	frameImg := drawFrame(step)
+	tomato.ToDraw(r, frameImg)
 
-	env.Draw() <- drawFrame(step)
+	//W 			:= RENDERER_W + PANEL_W
+	//H 	  		:= RENDERER_H + SEEKER_H + BOT_PANEL_H
 
+	//env.GL() <- func() { animator.Init(W, H) }
 
 	// TODO: decouple animation and event loop
 	// maybe not here the lag happens! probably in other part of code
 	for {
-		select{
+		select {
 		case x := <-aniToggle:
 			if !x {
 				running = false
@@ -476,8 +534,7 @@ func Renderer(env gui.Env,
 			}
 		case frameNumber := <-seekerChanged1:
 			step = frameNumber
-
-			out:
+		out:
 			for _ = range 10 {
 				time.Sleep(time.Second / 300)
 				select {
@@ -492,21 +549,27 @@ func Renderer(env gui.Env,
 		case <-drawOnce:
 			once = true
 		default:
-
 			if animator != nil && !running && needsRedraw {
-				env.Draw() <- drawFrame(step)
+				if step >= len(animator.Frames) {
+					step = 0
+				}
+				//env.Draw() <- drawFrame(step)
+				//env.GL() <- func () { animator.DrawFrame(step) }
+				frameImg = drawFrame(step)
+				tomato.ToDraw(r, frameImg)
 				needsRedraw = false
 			}
-
 			if (running || once) && animator != nil {
 				if step >= len(animator.Frames) {
 					step = 0
 				}
-				cursorCh       <- step
-				seekerChanged2 <- step
-				env.Draw() <- drawFrame(step)
-				step += 1
+				//env.GL() <- func() { animator.DrawFrame(step) }
+				frameImg = drawFrame(step)
+				tomato.ToDraw(r, frameImg)
 
+				cursorCh <- step
+				seekerChanged2 <- step
+				step += 1
 				time.Sleep(time.Second / 60)
 				once = false
 			}
@@ -514,75 +577,78 @@ func Renderer(env gui.Env,
 	}
 }
 
-func DataViewer(env gui.Env,
-    seekerChanged <-chan int, energyProfiler <-chan float64, energyProfilerReset <-chan bool,// input
+func DataViewer(
+	seekerChanged <-chan int, energyProfiler <-chan float64, energyProfilerReset <-chan bool, // input
 	r image.Rectangle, colorTheme *Theme, simulation *sim.Simulation) {
 
-	redraw := func(energies []float64, cursorPos int) func(drw draw.Image) image.Rectangle {
-		return func(drw draw.Image) image.Rectangle {
+	redraw := func(energies []float64, cursorPos int) draw.Image {
+		drw := image.NewRGBA(r)
 
-			col    := image.NewUniform(colorTheme.ProfilerForeground)
-			curCol := image.NewUniform(colorTheme.ProfilerCursor)
-			bgCol  := image.NewUniform(colorTheme.ProfilerBackground)
+		col := image.NewUniform(colorTheme.ProfilerForeground)
+		curCol := image.NewUniform(colorTheme.ProfilerCursor)
+		bgCol := image.NewUniform(colorTheme.ProfilerBackground)
 
-			draw.Draw(drw, r, bgCol, image.ZP, draw.Src)
+		draw.Draw(drw, r, bgCol, image.ZP, draw.Src)
 
-			frameCount := len(energies)
+		frameCount := len(energies)
 
-			if frameCount == 0 {
-				return r
-			}
-
-			minE := slices.Max(energies)
-			maxE := slices.Min(energies)
-			dE   := maxE - minE
-			dx   := float32(r.Dx()) / float32(frameCount+1)
-
-			// draw cursor
-			// TODO: make cursor here and in seeker behave the same
-			{
-				rect := r
-				rect.Min.X = int(dx * float32(cursorPos))
-				rect.Max.X = int(dx * float32(cursorPos)) + Max(int(dx), SEEKER_MIN_W)
-				draw.Draw(drw, rect.Intersect(r), curCol, image.ZP, draw.Src)
-			}
-
-			// draw energy scaled to height
-			rect := r
-			for i := range frameCount {
-				h := int((energies[i] - minE) / dE * float64(r.Dy())) + r.Min.Y
-				rect.Min.X = int(dx * float32(i+1))
-				rect.Max.X = int(dx * float32(i+2))
-				rect.Min.Y = h
-				rect.Max.Y = h+2
-				draw.Draw(drw, rect, col, image.ZP, draw.Src)
-			}
-
-			return r
+		if frameCount == 0 {
+			return drw
 		}
+
+		minE := slices.Max(energies)
+		maxE := slices.Min(energies)
+		dE := maxE - minE
+		dx := float32(r.Dx()) / float32(frameCount+1)
+
+		// draw cursor
+		// TODO: make cursor here and in seeker behave the same
+		{
+			rect := r
+			rect.Min.X = int(dx * float32(cursorPos))
+			rect.Max.X = int(dx*float32(cursorPos)) + Max(int(dx), SEEKER_MIN_W)
+			draw.Draw(drw, rect.Intersect(r), curCol, image.ZP, draw.Src)
+		}
+
+		// draw energy scaled to height
+		rect := r
+		for i := range frameCount {
+			h := int((energies[i]-minE)/dE*float64(r.Dy())) + r.Min.Y
+			rect.Min.X = int(dx * float32(i+1))
+			rect.Max.X = int(dx * float32(i+2))
+			rect.Min.Y = h
+			rect.Max.Y = h + 2
+			draw.Draw(drw, rect, col, image.ZP, draw.Src)
+		}
+
+		return drw
 	}
 
 	cursorPos := 0
-	energies  := make([]float64, 0)
-	env.Draw() <- redraw(energies, cursorPos)
+	energies := make([]float64, 0)
+	seekrImg := redraw(energies, cursorPos)
+	tomato.ToDraw(r, seekrImg)
 
 	for {
 		select {
 		case cursorPos = <-seekerChanged:
-			env.Draw() <- redraw(energies, cursorPos)
+			seekrImg := redraw(energies, cursorPos)
+			tomato.ToDraw(r, seekrImg)
 		case energy := <-energyProfiler:
 			energies = append(energies, energy)
-			env.Draw() <- redraw(energies, cursorPos)
+			seekrImg := redraw(energies, cursorPos)
+			tomato.ToDraw(r, seekrImg)
 		case <-energyProfilerReset:
 			energies = energies[:0]
 			cursorPos = 0
-			env.Draw() <- redraw(energies, cursorPos)
+			seekrImg := redraw(energies, cursorPos)
+			tomato.ToDraw(r, seekrImg)
 		}
 	}
 }
 
-func ConfigChoser(env gui.Env, configFolder string,
-	r image.Rectangle, colorTheme *Theme, mu *sync.Mutex, callback func(string)) {
+/*
+func ConfigChoser(configFolder string, r image.Rectangle, colorTheme *Theme, mu *sync.Mutex, callback func(string)) {
 
 	entries, err := os.ReadDir("./")
 	if err != nil {
@@ -677,48 +743,46 @@ func ConfigChoser(env gui.Env, configFolder string,
 	}
 
 	close(env.Draw())
-}
+} */
 
-func Terminal(env gui.Env, r image.Rectangle, colorTheme *Theme, mu *sync.Mutex, messageStream <-chan string) {
+func Terminal(r image.Rectangle, colorTheme *Theme, mu *sync.Mutex, messageStream <-chan string) {
 
-	redraw := func(msg string, sucess bool) func(drw draw.Image) image.Rectangle {
-		return func(drw draw.Image) image.Rectangle {
-			bg  := image.NewUniform(colorTheme.TermBackground)
-			draw.Draw(drw, r, bg, image.ZP, draw.Src)
+	redraw := func(msg string, sucess bool) draw.Image {
+		drw := image.NewRGBA(r)
+		bg := image.NewUniform(colorTheme.TermBackground)
+		draw.Draw(drw, r, bg, image.ZP, draw.Src)
 
-			textColor := colorTheme.ErrorRed
-			if sucess {
-				textColor = colorTheme.SuccessGreen
-			}
-
-			textImage := RenderTextMulti(msg, textColor, colorTheme.TermBackground, colorTheme.FontFaceTerm, r.Dx())
-			textRect := r
-			draw.Draw(drw, textRect, textImage, textImage.Bounds().Min, draw.Src)
-			return r
+		textColor := colorTheme.ErrorRed
+		if sucess {
+			textColor = colorTheme.SuccessGreen
 		}
+
+		textImage := RenderTextMulti(msg, textColor, colorTheme.TermBackground, colorTheme.FontFaceTerm, r.Dx())
+		textRect := r
+		draw.Draw(drw, textRect, textImage, textImage.Bounds().Min, draw.Src)
+		return drw
 	}
 
-
+	var termImg image.Image
 	for {
 		select {
 		case msg := <-messageStream:
 			fmt.Println(msg)
 			if rune(msg[0]) == '!' {
-				env.Draw() <- redraw(msg[1:], true)
+				termImg = redraw(msg[1:], true)
+				tomato.ToDraw(r, termImg)
 			} else {
-				env.Draw() <- redraw(msg, false)
+				termImg = redraw(msg, false)
+				tomato.ToDraw(r, termImg)
 			}
-		case _ = <-env.Events():
-			//fmt.Println(event)
 		default:
-			time.Sleep(time.Second/60)
+			time.Sleep(time.Second / 10)
 		}
 	}
 
 }
 
-
-func RenderText(text string, textColor, btnColor color.RGBA, fontFace font.Face) (draw.Image) {
+func RenderText(text string, textColor, btnColor color.RGBA, fontFace font.Face) draw.Image {
 
 	drawer := &font.Drawer{
 		Src:  &image.Uniform{textColor},
@@ -741,8 +805,7 @@ func RenderText(text string, textColor, btnColor color.RGBA, fontFace font.Face)
 	return drawer.Dst
 }
 
-func RenderTextMulti(text string, textColor, bgColor color.RGBA, fontFace font.Face, maxWidth int) (draw.Image) {
-
+func RenderTextMulti(text string, textColor, bgColor color.RGBA, fontFace font.Face, maxWidth int) draw.Image {
 
 	drawer := &font.Drawer{
 		Src:  &image.Uniform{textColor},
@@ -754,9 +817,9 @@ func RenderTextMulti(text string, textColor, bgColor color.RGBA, fontFace font.F
 
 	j := 0
 	i := 0
-	for i = 0; i < len(text) - 1; i++ {
-		b26_6, _ := drawer.BoundString(text[j:i+1])
-		if b26_6.Max.X.Ceil() - b26_6.Min.X.Floor() > maxWidth {
+	for i = 0; i < len(text)-1; i++ {
+		b26_6, _ := drawer.BoundString(text[j : i+1])
+		if b26_6.Max.X.Ceil()-b26_6.Min.X.Floor() > maxWidth {
 			lines = append(lines, text[j:i])
 			j = i
 		}
@@ -766,7 +829,7 @@ func RenderTextMulti(text string, textColor, bgColor color.RGBA, fontFace font.F
 		lines = append(lines, text[j:i])
 	}
 
-	maxW  := 0
+	maxW := 0
 	lineH := 0
 	for _, line := range lines {
 		b26_6, _ := drawer.BoundString(line)
@@ -796,72 +859,69 @@ func RenderTextMulti(text string, textColor, bgColor color.RGBA, fontFace font.F
 	return result
 }
 
+func Button(text string, colorTheme *Theme,
+	events chan tomato.Ev,
+	r image.Rectangle, mu *sync.Mutex, clicked func()) {
 
-
-func Button(env gui.Env, text string, colorTheme *Theme,
- 	r image.Rectangle, mu *sync.Mutex, clicked func()) {
-
-	var textImageUp    image.Image
+	var textImageUp image.Image
 	var textImageHover image.Image
 	{
 		mu.Lock()
-		textImageUp    = RenderText(text, colorTheme.ButtonText, colorTheme.ButtonUp, colorTheme.FontFace)
+		textImageUp = RenderText(text, colorTheme.ButtonText, colorTheme.ButtonUp, colorTheme.FontFace)
 		textImageHover = RenderText(text, colorTheme.ButtonText, colorTheme.ButtonHover, colorTheme.FontFace)
 		mu.Unlock()
 	}
 
-	redraw := func(visible bool, hover bool) func(draw.Image) image.Rectangle {
-		return func(drw draw.Image) image.Rectangle {
-
-			var textImage image.Image
-			var buttonBg  image.Image
-			if hover {
-				buttonBg  = image.NewUniform(colorTheme.ButtonHover)
-				textImage = textImageHover
-			} else {
-				buttonBg  = image.NewUniform(colorTheme.ButtonUp)
-				textImage = textImageUp
-			}
-
-			if visible {
-				draw.Draw(drw, r, buttonBg, image.ZP, draw.Src)
-				textRect := r
-				textRect.Min.Y += textRect.Dy()/2 - textImage.Bounds().Dy()/2
-				textRect.Min.X += textRect.Dx()/2 - textImage.Bounds().Dx()/2
-
-				draw.Draw(drw, textRect, textImage, textImage.Bounds().Min, draw.Src)
-			} else {
-				draw.Draw(drw, r, image.NewUniform(colorTheme.ButtonBlink), image.ZP, draw.Src)
-			}
-			return r
+	redraw := func(visible bool, hover bool) draw.Image {
+		img := image.NewRGBA(r)
+		var textImage image.Image
+		var buttonBg image.Image
+		if hover {
+			buttonBg = image.NewUniform(colorTheme.ButtonHover)
+			textImage = textImageHover
+		} else {
+			buttonBg = image.NewUniform(colorTheme.ButtonUp)
+			textImage = textImageUp
 		}
+		if visible {
+			draw.Draw(img, r, buttonBg, image.ZP, draw.Src)
+			textRect := r
+			textRect.Min.Y += textRect.Dy()/2 - textImage.Bounds().Dy()/2
+			textRect.Min.X += textRect.Dx()/2 - textImage.Bounds().Dx()/2
+
+			draw.Draw(img, textRect, textImage, textImage.Bounds().Min, draw.Src)
+		} else {
+			draw.Draw(img, r, image.NewUniform(colorTheme.ButtonBlink), image.ZP, draw.Src)
+		}
+		return img
 	}
 
-	env.Draw() <- redraw(true, false)
+	normalImg := redraw(true, false)
+	hoveredImg := redraw(true, true)
+	blinkImg := redraw(false, false)
 
-	for event := range env.Events() {
-		switch event := event.(type) {
-		case win.MoDown:
-			if event.Point.In(r) {
+	tomato.ToDraw(r, normalImg)
+
+	for ev := range events {
+		if ev.Kind == tomato.MouMove {
+			if ev.Point.In(r) {
+				tomato.ToDraw(r, hoveredImg)
+			} else {
+				tomato.ToDraw(r, normalImg)
+			}
+		}
+		if ev.Kind == tomato.MouDown {
+			if ev.Point.In(r) {
 				clicked()
 				for i := 0; i < 3; i++ {
-					env.Draw() <- redraw(false, false)
+					tomato.ToDraw(r, blinkImg)
 					time.Sleep(time.Second / 10)
-					env.Draw() <- redraw(true, false)
+					tomato.ToDraw(r, hoveredImg)
 					time.Sleep(time.Second / 10)
 				}
 			}
-		case win.MoMove:
-			if event.Point.In(r) {
-				env.Draw() <- redraw(true, true)
-			} else {
-				env.Draw() <- redraw(true, false)
-			}
 		}
-
 	}
-
-	close(env.Draw())
 }
 
 func Min(a, b int) int {
@@ -878,7 +938,6 @@ func Max(a, b int) int {
 	return b
 }
 
-
 func main() {
-	mainthread.Run(run)
+	run()
 }
