@@ -156,15 +156,15 @@ func run() {
 	energyProfilerReset := make(chan bool)
 	drawOnce := make(chan bool)
 	msgStream := make(chan string)
-
+	
 	// Event Fowarding Channels
 	// @Todo make this behind some abstraction maybe?
-	forwarding := make([]chan tomato.Ev, 5)
+	forwarding := make([]chan tomato.Ev, 7)
 	//forwarding_boxes := make([]image.Rectangle, len(forwarding))
 	for i := range forwarding {
 		forwarding[i] = make(chan tomato.Ev)
 	}
-
+	
 	go Terminal(
 		image.Rect(W-PANEL_W, RENDERER_H, W, H),
 		colorTheme, &fontMu, msgStream)
@@ -196,7 +196,7 @@ func run() {
 			image.Rect(0, 0, RENDERER_W, RENDERER_H), &animator)
 
 		go Seeker(
-			forwarding[4],
+			forwarding[6],
 			framesChanged, cursorChanged,
 			seekerChanged1, seekerChanged2,
 			image.Rect(0, RENDERER_H, RENDERER_W, RENDERER_H+SEEKER_H), colorTheme)
@@ -252,32 +252,35 @@ func run() {
 				*/
 			})
 
-		/*
-			go Button("Load Configuration", colorTheme,
-				image.Rect(xa, 4*(BTN_H+MARGIN_BOT), xb, 4*(BTN_H+MARGIN_BOT)+BTN_H), &fontMu,
-				func() {
-					go ConfigChoser("./", image.Rect(xa, 5*(BTN_H+MARGIN_BOT), xb, RENDERER_H), colorTheme, &fontMu,
-						func(configPath string) {
-							simulationToggle <- false
-							animationToggle <- false
-							err, simulation = sim.MakeSimulationFromConfig(configPath)
-							if err != nil {
-								msgStream <- fmt.Sprintf("%v", err)
-							} else {
-								msgStream <- fmt.Sprintf("!loaded `%v` sucessfully!", configPath)
-							}
+		go Button("Load Configuration", colorTheme,
+			forwarding[4],
+			image.Rect(xa, 4*(BTN_H+MARGIN_BOT), xb, 4*(BTN_H+MARGIN_BOT)+BTN_H),
+			&fontMu, func() {
+				go ConfigChoser(forwarding[5],
+					"./",
+					image.Rect(xa, 5*(BTN_H+MARGIN_BOT), xb, RENDERER_H),
+					colorTheme,
+					&fontMu,
+					func(configPath string) {
+						simulationToggle <- false
+						animationToggle <- false
+						err, simulation = sim.MakeSimulationFromConfig(configPath)
+						if err != nil {
+							msgStream <- fmt.Sprintf("%v", err)
+						} else {
+							msgStream <- fmt.Sprintf("!loaded `%v` sucessfully!", configPath)
+						}
 
-							seekerChanged1 <- 0
-							//animator   = sim.MakeAnimator(&simulation)
-							animator = sim.MakeAnimatorGL(&simulation)
-							env.GL() <- func() { animator.Init(W, H) }
+						seekerChanged1 <- 0
+						animator   = sim.MakeAnimator(&simulation)
+						//animator = sim.MakeAnimatorGL(&simulation)
+						//env.GL() <- func() { animator.Init(W, H) }
 
-							drawOnce <- true
-							energyProfilerReset <- true
-							framesChanged <- 1
-
+						drawOnce <- true
+						energyProfilerReset <- true
+						framesChanged <- 1
 					})
-			}) */
+			})
 	}
 
 	tick := 0
@@ -299,11 +302,11 @@ func run() {
 				case tomato.MouDown,
 					tomato.MouUp,
 					tomato.MouMove:
-					// forward to ui elements
+					// forward messages
 					for i := range forwarding {
-						//if event.Point.In(btn_boxes[i]) {
-						forwarding[i] <- event
-						//}
+						go func() {
+							forwarding[i] <- event
+						}()
 					}
 				}
 			default:
@@ -493,6 +496,12 @@ func Seeker(
 
 }
 
+/* Ok so we have 3 input channels,
+   the aniToggle (from the play button),
+   the seekerChanged1 (from the seeker),
+   the drawOnce (
+*/
+
 func Renderer(
 	aniToggle <-chan bool, seekerChanged1 <-chan int, drawOnce <-chan bool, // input
 	cursorCh chan<- int, seekerChanged2 chan<- int, // output
@@ -570,6 +579,9 @@ func Renderer(
 				cursorCh <- step
 				seekerChanged2 <- step
 				step += 1
+
+				// this is stupid and should be in the main loop
+				// the framerate should be defined in the main loop
 				time.Sleep(time.Second / 60)
 				once = false
 			}
@@ -647,20 +659,20 @@ func DataViewer(
 	}
 }
 
-/*
-func ConfigChoser(configFolder string, r image.Rectangle, colorTheme *Theme, mu *sync.Mutex, callback func(string)) {
 
-	entries, err := os.ReadDir("./")
+func ConfigChoser(events chan tomato.Ev, configFolder string, r image.Rectangle, colorTheme *Theme, mu *sync.Mutex, callback func(string)) {
+
+	entries, err := os.ReadDir(configFolder)
 	if err != nil {
 		panic(err)
 	}
 
 	configFilePaths := make([]string, 0, 20)
-    for _, e := range entries {
-    	if strings.HasSuffix(e.Name(), ".sph-config") {
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".sph-config") {
 			configFilePaths = append(configFilePaths, e.Name())
-    	}
-    }
+		}
+	}
 
 	// make textures for options
 	textImagesUp    := make([]image.Image, 0, len(configFilePaths))
@@ -680,55 +692,63 @@ func ConfigChoser(configFolder string, r image.Rectangle, colorTheme *Theme, mu 
 	}
 
 
-	drawOption := func(index int, hover bool) func(draw.Image) image.Rectangle {
+	drawOption := func(index int) (draw.Image, draw.Image, image.Rectangle) {
 
 		rect := r
 		rect.Min.Y = r.Min.Y + index * OPTION_H
 		rect.Max.Y = r.Min.Y + (index + 1)  * OPTION_H - OPTION_PAD
 
-		return func(drw draw.Image) image.Rectangle {
-			var textImage image.Image
-			var buttonBg  image.Image
-			if hover {
-				buttonBg  = image.NewUniform(colorTheme.OptionHover)
-				textImage = textImagesHover[index]
-			} else {
-				buttonBg  = image.NewUniform(colorTheme.OptionUp)
-				textImage = textImagesUp[index]
-			}
+		textBounds := textImagesUp[index].Bounds()
+		var buttonBgHover  = image.NewUniform(colorTheme.OptionHover)
+		var buttonBgUp  = image.NewUniform(colorTheme.OptionUp)
 
-			draw.Draw(drw, rect, buttonBg, image.ZP, draw.Src)
-			textRect := rect
-			textRect.Min.Y += textRect.Dy()/2 - textImage.Bounds().Dy()/2
-			textRect.Min.X += textRect.Dx()/2 - textImage.Bounds().Dx()/2
+		drwUp    := image.NewRGBA(r)
+		drwHover := image.NewRGBA(r)
+		
+		draw.Draw(drwUp,    rect, buttonBgUp, image.ZP, draw.Src)
+		draw.Draw(drwHover, rect, buttonBgHover, image.ZP, draw.Src)
 
-			draw.Draw(drw, textRect, textImage, textImage.Bounds().Min, draw.Src)
-			return rect
-		}
+		textRect := rect
+		textRect.Min.Y += textRect.Dy()/2 - textBounds.Dy()/2
+		textRect.Min.X += textRect.Dx()/2 - textBounds.Dx()/2
+
+		draw.Draw(drwUp, textRect, textImagesUp[index], textBounds.Min, draw.Src)
+		
+		draw.Draw(drwHover, textRect, textImagesHover[index], textBounds.Min, draw.Src)
+		
+		return drwUp, drwHover, rect
 	}
 
+	var optionsHover []draw.Image
+	var optionsUp    []draw.Image
+	var optionsRects []image.Rectangle
+
 	for i := range configFilePaths {
-		env.Draw() <- drawOption(i, false)
+		u, h, r := drawOption(i) 
+		optionsHover = append(optionsHover, h)
+		optionsUp    = append(optionsUp, u)
+		optionsRects = append(optionsRects, r)
+		tomato.ToDraw(r, u)
 	}
 
 	over := -1
 
 	exit:
-	for event := range env.Events() {
-		switch event := event.(type) {
-		case win.MoDown:
+	for event := range events {
+		switch event.Kind {
+		case tomato.MouDown:
 			i := (event.Point.Y - r.Min.Y) / OPTION_H
 			if event.Point.In(r) && i >= 0 && i < len(configFilePaths) {
 				callback(configFilePaths[i])
+				break exit
 			}
-			break exit
-		case win.MoMove:
+		case tomato.MouMove:
 			if event.Point.In(r) {
 				supposedIndex := (event.Point.Y - r.Min.Y) / OPTION_H
 				if supposedIndex != over && supposedIndex >= 0 && supposedIndex < len(configFilePaths){
-					env.Draw() <- drawOption(supposedIndex, true)
+					tomato.ToDraw(optionsRects[supposedIndex], optionsHover[supposedIndex])
 					if over >= 0 {
-						env.Draw() <- drawOption(over, false)
+						tomato.ToDraw(optionsRects[over], optionsUp[over])
 					}
 					over = supposedIndex
 				}
@@ -736,14 +756,10 @@ func ConfigChoser(configFolder string, r image.Rectangle, colorTheme *Theme, mu 
 		}
 	}
 
-	env.Draw() <- func(drw draw.Image) image.Rectangle {
-		bg  := image.NewUniform(colorTheme.Background)
-		draw.Draw(drw, r, bg, image.ZP, draw.Src)
-		return r
-	}
+	fmt.Println(len(optionsHover))
 
-	close(env.Draw())
-} */
+	tomato.ToDraw(r, image.NewUniform(colorTheme.Background))
+}
 
 func Terminal(r image.Rectangle, colorTheme *Theme, mu *sync.Mutex, messageStream <-chan string) {
 

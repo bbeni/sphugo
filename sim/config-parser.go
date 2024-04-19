@@ -829,7 +829,6 @@ var exampleConfigSource1 = `//  Config file for SPHUGO SPH Simulation
 //  This is an example configuration.
 //  <- This is a line comment (only allowed at start of line)
 
-
 [[Simulation]]
 [Config]
 NSteps              1000
@@ -838,9 +837,8 @@ ParticleMass        1000000.0
 // A 2-D Vector just has 2 components separated by space(s)
 Acceleration        0       0.55
 DeltaTHalf          0.00324
-//Kernel		    Monahan
-Kernel				Wendtland
-
+//Kernel            Monahan
+Kernel              Wendtland
 
 // Initial setup of particles, for now we can add Uniformely Random distributed Rectangels only
 [[Start]]
@@ -858,8 +856,8 @@ LowerRight          0.4     0.9
 // Per default boundaries are open
 [[Boundaries]]
 [Periodic]
-Horizontal           0.2       0.8
-Vertical              -100      0.95
+Horizontal          0.2       0.8
+Vertical            -100      0.95
 
 // THIS IS NOT IMPLEMENTED
 // A reflection reflects particles without losing momentum
@@ -869,10 +867,10 @@ ToOrigin            0       0.9
 // A reflection boundary taht excludes origin (top-left corner)
 FromOrigin          0.2     0.2
 
-[[Sources]]
-[Point]
-Pos               0.21     0.21
-Rate              10
+//[[Sources]]
+//[Point]
+//Pos               0.21     0.21
+//Rate              10
 
 // THIS IS NOT IMPLEMENTED
 // Coordinates of viewport for animation
