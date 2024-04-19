@@ -101,9 +101,11 @@ func (spwn *PointSource) Spawn(t float64) []Particle {
 	return particles
 }
 
-type Reflection struct {
-	Offset	   Vec2
-	FromOrigin bool
+type Reflections struct {
+	L float64
+	R float64
+	U float64
+	D float64	
 }
 
 type SphConfig struct {
@@ -118,7 +120,7 @@ type SphConfig struct {
 	HorPeriodicity  [2]float64 // -math.MaxFloat64, math.MaxFloat64 is open
 	VertPeriodicity [2]float64 // -math.MaxFloat64, math.MaxFloat64 is open
 
-	Reflections	    []Reflection
+	Reflections	    Reflections
 	Sources 		[]ParticleSource
 	Start			[]ParticleSource
 
@@ -137,6 +139,11 @@ func MakeConfig() SphConfig {
 
 		VertPeriodicity: [2]float64{-math.MaxFloat64, math.MaxFloat64},
 		HorPeriodicity:  [2]float64{-math.MaxFloat64, math.MaxFloat64},
+
+		Reflections: Reflections{
+			L: -math.MaxFloat64, R: math.MaxFloat64,
+			U: -math.MaxFloat64, D: math.MaxFloat64,
+		},
 
 		Viewport:  	  [2]Vec2{Vec2{0, 0}, Vec2{1, 1}},
 	}
@@ -331,17 +338,23 @@ func (config *SphConfig) updateFromTokens(tokens []Token) error {
 				if err != nil { return err }
 				config.HorPeriodicity = [2]float64{x.X, x.Y}
 
-			case Param{"Boundaries", "Reflection", "ToOrigin"}:
-				x, err := checkVec2(token, p)
+			case Param{"Boundaries", "Reflection", "Left"}:
+				x, err := checkFloat(token, p)
 				if err != nil { return err }
-				config.Reflections = append(config.Reflections,
-				 	Reflection{Offset: x, FromOrigin: false,})
-			case Param{"Boundaries", "Reflection", "FromOrigin"}:
-				x, err := checkVec2(token, p)
+				config.Reflections.L = x
+			case Param{"Boundaries", "Reflection", "Right"}:
+				x, err := checkFloat(token, p)
 				if err != nil { return err }
-				config.Reflections = append(config.Reflections,
-				 	Reflection{Offset: x, FromOrigin: true,})
-
+				config.Reflections.R = x
+			case Param{"Boundaries", "Reflection", "Up"}:
+				x, err := checkFloat(token, p)
+				if err != nil { return err }
+				config.Reflections.U = x
+			case Param{"Boundaries", "Reflection", "Down"}:
+				x, err := checkFloat(token, p)
+				if err != nil { return err }
+				config.Reflections.D = x
+			
 			case Param{"Sources", "Point", "Pos"},
 				Param{"Sources", "Point", "Rate"}:
 
@@ -806,8 +819,9 @@ func inSlice(list []string, a string) bool {
 }
 
 
-func GenerateDefaultConfigFile(filePath string) {
-	GenerateTextFile(filePath, exampleConfigSource1)
+func GenerateDefaultConfigFiles(filePaths [2]string) {
+	GenerateTextFile(filePaths[0], exampleConfigSource1)
+	GenerateTextFile(filePaths[1], exampleConfigSource2)
 }
 
 func GenerateTextFile(filePath string, source string) {
@@ -828,6 +842,8 @@ func GenerateTextFile(filePath string, source string) {
 var exampleConfigSource1 = `//  Config file for SPHUGO SPH Simulation
 //  This is an example configuration.
 //  <- This is a line comment (only allowed at start of line)
+//  The coordinate origin 0 0 is in the top left corner x direction right, y direction down
+//
 
 [[Simulation]]
 [Config]
@@ -857,15 +873,12 @@ LowerRight          0.4     0.9
 [[Boundaries]]
 [Periodic]
 Horizontal          0.2       0.8
-Vertical            -100      0.95
+Vertical            -100      100
 
 // THIS IS NOT IMPLEMENTED
 // A reflection reflects particles without losing momentum
 [Reflection]
-// A refelection line orthognal to origin that refelcts towards origin
-ToOrigin            0       0.9
-// A reflection boundary taht excludes origin (top-left corner)
-FromOrigin          0.2     0.2
+Down                0.99
 
 //[[Sources]]
 //[Point]
@@ -873,6 +886,55 @@ FromOrigin          0.2     0.2
 //Rate              10
 
 // THIS IS NOT IMPLEMENTED
+// Coordinates of viewport for animation
+[[Simulation]]
+[Viewport]
+UpperLeft           0       0
+LowerRight          1       1
+`
+
+var exampleConfigSource2 = `//  Config file for SPHUGO SPH Simulation
+//  This is an example configuration.
+//  Tube that is open to the right
+
+[[Simulation]]
+[Config]
+NSteps              1000
+Gamma               4.666
+ParticleMass        100000.0
+// A 2-D Vector just has 2 components separated by space(s)
+Acceleration        0       0.05
+DeltaTHalf          0.00424
+//Kernel		    Monahan
+Kernel				Wendtland
+
+// Initial setup of particles, for now we can add Uniformely Random distributed Rectangels only
+[[Start]]
+
+[UniformRect]
+NParticles          4000
+UpperLeft           0.3     0.3
+LowerRight          0.7     0.4
+
+[UniformRect]
+NParticles          700
+UpperLeft           0.3    0.3
+LowerRight          0.7    0.5
+
+// Per default boundaries are open
+[[Boundaries]]
+[Reflection]
+Left 0.2
+Up 0.25
+Down 0.5
+
+// Sources with constant rate (unstable feature)
+[[Sources]]
+[Point]
+//Pos               0.2     0.2
+//Rate              100
+
+// THIS IS NOT IMPLEMENTED! Has no effect!
 // Coordinates of viewport for animation
 [[Simulation]]
 [Viewport]

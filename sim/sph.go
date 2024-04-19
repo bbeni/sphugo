@@ -169,8 +169,25 @@ func (sim *Simulation) Step() {
 		// TODO: unhardcode refelction boundaries
 		for i, _ := range sim.Root.Particles {
 			p := &sim.Root.Particles[i]
-			if p.Pos.Y > 0.94 {
-				p.Pos.Y -= p.Pos.Y - 0.94
+
+			// Left reflection
+			if p.Pos.X < sim.Config.Reflections.L {
+				p.Pos.X -= p.Pos.X - sim.Config.Reflections.L
+				p.Vel.X = -p.Vel.X
+			}
+			// Right reflection
+			if p.Pos.X > sim.Config.Reflections.R {
+				p.Pos.X -= p.Pos.X - sim.Config.Reflections.R
+				p.Vel.X = -p.Vel.X
+			}
+			// Up reflection
+			if p.Pos.Y < sim.Config.Reflections.U {
+				p.Pos.Y -= p.Pos.Y - sim.Config.Reflections.U
+				p.Vel.Y = -p.Vel.Y
+			}
+			// Down reflection
+			if p.Pos.Y > sim.Config.Reflections.D {
+				p.Pos.Y -= p.Pos.Y - sim.Config.Reflections.D
 				p.Vel.Y = -p.Vel.Y
 			}
 		}
@@ -400,12 +417,7 @@ func (sim *Simulation) CalculateForces() {
 
 	// claculate all nearest neighbours
 	for i, _ := range sim.Root.Particles {
-
-		// !!!
-		// TODO: is the boundary a bug? we should actually use the config values in the boundary!!!
-		// !!!
-
-		sim.Root.Particles[i].FindNearestNeighboursPeriodic(sim.Root, [2]float64{-1, 2}, [2]float64{-1, 2})
+		sim.Root.Particles[i].FindNearestNeighboursPeriodic(sim.Root, sim.Config.HorPeriodicity, sim.Config.VertPeriodicity)
 	}
 
 	// Calculate Nearest Neighbor Density Rho
@@ -414,9 +426,7 @@ func (sim *Simulation) CalculateForces() {
 		p.Rho = Density2D(p, sim, sim.Config.Kernel)
 	}
 
-
-	// Calculate speed of sound
-	// c = sqrt(gamma(gamma-1)ePred)
+	// Calculate speed of sound c = sqrt(gamma(gamma-1)ePred)
 	// gamma heat capacity ratio = 1 + 2/f
 	{
 		factor := sim.Config.Gamma * (sim.Config.Gamma - 1)
@@ -426,8 +436,7 @@ func (sim *Simulation) CalculateForces() {
 		}
 	}
 
-	// Calculate Nearest Neighbor SPH forces
-	// VDot, EDot
+	// Calculate Nearest Neighbor SPH forces (VDot, EDot)
 	for i, _ := range sim.Root.Particles {
 		AccelerationAndEDot2D(&sim.Root.Particles[i], sim, sim.Config.Kernel)
 	}

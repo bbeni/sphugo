@@ -170,14 +170,14 @@ func run() {
 		colorTheme, &fontMu, msgStream)
 
 	// create example config file if not existent
-	exampleConfigFilePath := "example.sph-config"
-	sim.GenerateDefaultConfigFile(exampleConfigFilePath)
+	exampleConfigFilePaths := [2]string{"example.sph-config", "tube.sph-config"}
+	sim.GenerateDefaultConfigFiles(exampleConfigFilePaths)
 
-	err, simulation := sim.MakeSimulationFromConfig(exampleConfigFilePath)
+	err, simulation := sim.MakeSimulationFromConfig(exampleConfigFilePaths[0])
 	if err != nil {
 		msgStream <- fmt.Sprintf("%v", err)
 	} else {
-		msgStream <- fmt.Sprintf("!loaded `%v` sucessfully  (Hint: it's in the same directory as this program!) ", exampleConfigFilePath)
+		msgStream <- fmt.Sprintf("!loaded `%v` sucessfully  (Hint: config files are in the same directory as this program!) ", exampleConfigFilePaths[0])
 	}
 
 	animator := sim.MakeAnimator(&simulation)
@@ -243,12 +243,11 @@ func run() {
 			forwarding[3],
 			rect3,
 			&fontMu, func() {
-				// TODO: fix code
 				/*
-					i := animator.ActiveFrame
-					file_path := fmt.Sprintf("frame%v.png", i)
-					animator.FrameToPNG(file_path)
-					log.Printf("Created PNG %s.", file_path)
+				i := animator.ActiveFrame
+				file_path := fmt.Sprintf("frame%v.png", i)
+				animator.FrameToPNG(file_path, i)
+				log.Printf("Created PNG %s.", file_path)
 				*/
 			})
 
