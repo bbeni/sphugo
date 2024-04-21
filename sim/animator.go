@@ -90,7 +90,7 @@ func (ani *Animator) CurrentFrame() gx.Canvas {
 		color := gx.ParaRamp(color_index)
 		//color := gx.HeatRamp(color_index)
 		//color := gx.ToxicRamp(color_index)
-		//color := gx.RainbowRamp(color_index)
+	    //color := gx.RainbowRamp(255 - color_index)
 
 
 		if color_index > 255 {

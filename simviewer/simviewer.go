@@ -76,6 +76,15 @@ type Theme struct {
 	FontFaceTerm font.Face
 }
 
+
+// slowly migrating to this
+type SimviewerState struct {
+	CursorPos int
+	AnimationRunning bool
+	CurrentFrame image.Image
+}
+
+var svState SimviewerState
 func run() {
 
 	W := RENDERER_W + PANEL_W
@@ -145,25 +154,21 @@ func run() {
 		return r
 	}*/
 
-	// TODO: cleanup this mess, too many channels and/or missleading names!
 	simulationToggle := make(chan bool) // if false is sent it turns it off
-	animationToggle := make(chan bool)  // if false is sent it turns it off
-	framesChanged := make(chan int)
-	cursorChanged := make(chan int)
-	seekerChanged1 := make(chan int)
-	seekerChanged2 := make(chan int)
 	energyProfiler := make(chan float64)
-	energyProfilerReset := make(chan bool)
-	drawOnce := make(chan bool)
 	msgStream := make(chan string)
+
+
+	//energyProfilerReset := make(chan bool)
+	//drawOnce := make(chan bool)
 	
 	// Event Fowarding Channels
 	// @Todo make this behind some abstraction maybe?
-	forwarding := make([]chan tomato.Ev, 7)
+	//forwarding := make([]chan tomato.Ev, 7)
 	//forwarding_boxes := make([]image.Rectangle, len(forwarding))
-	for i := range forwarding {
-		forwarding[i] = make(chan tomato.Ev)
-	}
+	//for i := range forwarding {
+	//	forwarding[i] = make(chan tomato.Ev)
+	//}
 	
 	go Terminal(
 		image.Rect(W-PANEL_W, RENDERER_H, W, H),
@@ -182,111 +187,57 @@ func run() {
 
 	animator := sim.MakeAnimator(&simulation)
 	//animator   := sim.MakeAnimatorGL(&simulation)
+	go Simulator(simulationToggle, energyProfiler, &simulation, &animator)
 
-	// Background/Gui processes
-	{
-		go Simulator(
-			simulationToggle,
-			framesChanged, energyProfiler,
-			&simulation, &animator)
+	/*
+	xa := W - PANEL_W
+	xb := W
 
-		go Renderer(
-			animationToggle, seekerChanged1, drawOnce,
-			cursorChanged, seekerChanged2,
-			image.Rect(0, 0, RENDERER_W, RENDERER_H), &animator)
+	go Button("Load Configuration", colorTheme,
+		forwarding[4],
+		image.Rect(xa, 4*(BTN_H+MARGIN_BOT), xb, 4*(BTN_H+MARGIN_BOT)+BTN_H),
+		&fontMu, func() {
+			go ConfigChoser(forwarding[5],
+				"./",
+				image.Rect(xa, 5*(BTN_H+MARGIN_BOT), xb, RENDERER_H),
+				colorTheme,
+				&fontMu,
+				func(configPath string) {
+					//simulationToggle <- false
+					//animationToggle <- false
+					err, simulation = sim.MakeSimulationFromConfig(configPath)
+					if err != nil {
+						msgStream <- fmt.Sprintf("%v", err)
+					} else {
+						msgStream <- fmt.Sprintf("!loaded `%v` sucessfully!", configPath)
+					}
 
-		go Seeker(
-			forwarding[6],
-			framesChanged, cursorChanged,
-			seekerChanged1, seekerChanged2,
-			image.Rect(0, RENDERER_H, RENDERER_W, RENDERER_H+SEEKER_H), colorTheme)
+					//seekerChanged1 <- 0
+					//animator   = sim.MakeAnimator(&simulation)
+					//animator = sim.MakeAnimatorGL(&simulation)
+					//env.GL() <- func() { animator.Init(W, H) }
 
-		go DataViewer(
-			seekerChanged2, energyProfiler, energyProfilerReset,
-			image.Rect(0, RENDERER_H+SEEKER_H, RENDERER_W, RENDERER_H+SEEKER_H+BOT_PANEL_H), colorTheme, &simulation)
-	}
-
-	// Button Elements
-	{
-		xa := W - PANEL_W
-		xb := W
-
-		rect0 := image.Rect(xa, 0, xb, BTN_H)
-		rect1 := image.Rect(xa, 1*(BTN_H+MARGIN_BOT), xb, 1*(BTN_H+MARGIN_BOT)+BTN_H)
-		rect2 := image.Rect(xa, 2*(BTN_H+MARGIN_BOT), xb, 2*(BTN_H+MARGIN_BOT)+BTN_H)
-		rect3 := image.Rect(xa, 3*(BTN_H+MARGIN_BOT), xb, 3*(BTN_H+MARGIN_BOT)+BTN_H)
-
-		//forwarding_boxes[0] = rect0
-		//forwarding_boxes[1] = rect1
-		//forwarding_boxes[2] = rect2
-		//forwarding_boxes[3] = rect3
-
-		go Button("Run/Stop Simulation", colorTheme,
-			forwarding[0],
-			rect0,
-			&fontMu, func() {
-				simulationToggle <- true
-			})
-		go Button("Play/Pause Animation", colorTheme,
-			forwarding[1],
-			rect1,
-			&fontMu, func() {
-				animationToggle <- true
-			})
-		go Button("Render to .mp4", colorTheme,
-			forwarding[2],
-			rect2,
-			&fontMu, func() {
-
-			})
-		go Button("Current Frame to .png", colorTheme,
-			forwarding[3],
-			rect3,
-			&fontMu, func() {
-				/*
-				i := animator.ActiveFrame
-				file_path := fmt.Sprintf("frame%v.png", i)
-				animator.FrameToPNG(file_path, i)
-				log.Printf("Created PNG %s.", file_path)
-				*/
-			})
-
-		go Button("Load Configuration", colorTheme,
-			forwarding[4],
-			image.Rect(xa, 4*(BTN_H+MARGIN_BOT), xb, 4*(BTN_H+MARGIN_BOT)+BTN_H),
-			&fontMu, func() {
-				go ConfigChoser(forwarding[5],
-					"./",
-					image.Rect(xa, 5*(BTN_H+MARGIN_BOT), xb, RENDERER_H),
-					colorTheme,
-					&fontMu,
-					func(configPath string) {
-						simulationToggle <- false
-						animationToggle <- false
-						err, simulation = sim.MakeSimulationFromConfig(configPath)
-						if err != nil {
-							msgStream <- fmt.Sprintf("%v", err)
-						} else {
-							msgStream <- fmt.Sprintf("!loaded `%v` sucessfully!", configPath)
-						}
-
-						seekerChanged1 <- 0
-						animator   = sim.MakeAnimator(&simulation)
-						//animator = sim.MakeAnimatorGL(&simulation)
-						//env.GL() <- func() { animator.Init(W, H) }
-
-						drawOnce <- true
-						energyProfilerReset <- true
-						framesChanged <- 1
-					})
-			})
-	}
+					//drawOnce <- true
+					//energyProfilerReset <- true
+					//framesChanged <- 1
+				})
+		})*/
 
 	tick := 0
+	eventsThisTick := make([]tomato.Ev, 0)
+	previousTime := time.Now()
 
-	// main loop
+	svState.CurrentFrame = animator.Frames[svState.CursorPos]
+	dataViewer := MakeDv()
+
+
+	tomato.SetupUi()
 	for tomato.Alive() {
-	events_loop:
+
+		//fmt.Println(tick)
+		eventsThisTick = eventsThisTick[:0]
+
+		events_loop:
 		for {
 			select {
 			case event := <-tomato.Events():
@@ -296,45 +247,76 @@ func run() {
 						tomato.Die()
 					}
 					if event.Key == tomato.Space {
-						animationToggle <- true
+						svState.AnimationRunning = !svState.AnimationRunning
 					}
 				case tomato.MouDown,
 					tomato.MouUp,
 					tomato.MouMove:
-					// forward messages
-					for i := range forwarding {
-						go func() {
-							forwarding[i] <- event
-						}()
-					}
+					eventsThisTick = append(eventsThisTick, event)
 				}
+			case energyChanged := <-energyProfiler:
+				dataViewer.AddValue(energyChanged)
 			default:
 				break events_loop
 			}
 		}
 
-		// do logic
-		//
-		// @Todo calculate more stuff here !!
-		//
-
-		//fmt.Println(tick)
-		tick++
-
-		// draw every 4th frame
-		if tick%1 == 0 {
-			tomato.Draw()
+		// Seeker
+		where := image.Rect(0, RENDERER_H, RENDERER_W, RENDERER_H+SEEKER_H)
+		cursorPosBefore := svState.CursorPos
+		svState.CursorPos = Seeker(len(animator.Frames),
+											svState.CursorPos,
+											where,
+											colorTheme,
+											eventsThisTick)
+		if cursorPosBefore != svState.CursorPos {
+			svState.CurrentFrame = animator.Frames[svState.CursorPos]
 		}
 
+		dvWhere := image.Rect(0, RENDERER_H+SEEKER_H, RENDERER_W, RENDERER_H+SEEKER_H+BOT_PANEL_H)
+		dataViewer.DrawDataViewer(svState.CursorPos, colorTheme, dvWhere)
+
+		if svState.AnimationRunning {
+			svState.CursorPos = (svState.CursorPos + 1) % len(animator.Frames)
+			svState.CurrentFrame = animator.Frames[svState.CursorPos]
+		}
+		tomato.ToDraw(image.Rect(0, 0, RENDERER_W, RENDERER_H), svState.CurrentFrame)
+
+		{
+			tomato.Layout(0, tomato.Vertical, image.Rect(W - PANEL_W, 0, W, RENDERER_H))
+
+			if tomato.TextButton(0, "Run/Stop Simulation") {
+				// race occurs here, for now we just async call the toggle to not block here
+				// it feels kinda slower now ... but not so sure
+				go func() {simulationToggle <- true}()
+				//simulationToggle <- true
+			}
+
+			if tomato.TextButton(1, "Play/Pause Animation") {
+				svState.AnimationRunning = !svState.AnimationRunning
+			}
+			tomato.TextButton(2, "Render to .mp4")
+			tomato.TextButton(3, "Current Frame to .png")
+			tomato.TextButton(4, "Load Configuration")
+		}
+
+		tomato.DrawUi()
 		tomato.Win.SwapBuffers()
+		tomato.Clear()
+
+		dt := time.Now().Sub(previousTime)
+		previousTime = time.Now()
+		_ = dt
+		fmt.Printf("%.3v FPS\n", 1/dt.Seconds())
 		time.Sleep(time.Second / 120)
+		tick++
 	}
 }
 
 // Background Process for starting/stopping simulation
 func Simulator(
 	simToggle <-chan bool, // input
-	framesChanged chan<- int, energyProfiler chan<- float64, // output
+	energyProfiler chan<- float64, // output
 	simulation *sim.Simulation, animator *sim.Animator) {
 	running := false
 	for {
@@ -347,317 +329,173 @@ func Simulator(
 				running = !running
 			}
 		default:
-
 			if running {
 				simulation.Step()
 				energy := simulation.TotalEnergy()
 				//energy := simulation.TotalDensity()
 				animator.Frame()
 				//animator.AddFrame()
-
-				framesChanged <- len(animator.Frames)
-				//framesChanged  <- animator.NumberFrames()
 				energyProfiler <- energy
 			}
+			time.Sleep(time.Second / 100)
 		}
 	}
 }
 
-func Seeker(
-	events <-chan tomato.Ev,
-	framesCh <-chan int, cursorCh <-chan int, // input
-	seekerChanged1, seekerChanged2 chan<- int, // output
-	r image.Rectangle, colorTheme *Theme) {
-	frameCount := 0
-	cursorPos := 0
 
-	// draws the seeker at a given position
-	drawSeeker := func(frameCount, cursorPos int) draw.Image {
-
-		if cursorPos >= frameCount && frameCount != 0 {
-			panic("cursor pos higher that frame count!")
-		}
-
-		if frameCount == 0 {
-			frameCount = 1
-		}
-
-		drw := image.NewRGBA(r)
-
-		//
-		// draw background
-		//
-
-		imgUni := image.NewUniform(colorTheme.SeekerBackground)
-		draw.Draw(drw, r, imgUni, image.ZP, draw.Src)
-
-		//
-		// draw frame hints
-		//
-
-		imgUni = image.NewUniform(colorTheme.SeekerFrame)
-		frameRect := r
-
-		frameDx := float32(r.Dx()) / float32(frameCount)
-
-		if frameDx <= SEEKER_MIN_W {
-			draw.Draw(drw, r, imgUni, image.ZP, draw.Src)
-			frameDx = float32(SEEKER_MIN_W)
-		} else {
-			for i := range frameCount {
-				frameRect.Min.X = int(frameDx*float32(i)) + SEEKER_PAD/2
-				frameRect.Max.X = int(frameDx*float32(i+1)) - SEEKER_PAD/2
-				draw.Draw(drw, frameRect, imgUni, image.ZP, draw.Src)
-			}
-		}
-
-		//
-		// draw cursor
-		//
-
-		imgUni = image.NewUniform(colorTheme.SeekerCursor)
-
-		cursorW := Min(int(frameDx), int(SEEKER_W))
-		cursorOffset := image.Point{int(frameDx/2 - float32(cursorW)/2), 0}
-		cursorRect := r
-		cursorRect.Min.X = int((float32(r.Dx()) / float32(frameCount)) * float32(cursorPos))
-		cursorRect.Max.X = cursorRect.Min.X + cursorW
-		cursorRect = cursorRect.Add(cursorOffset)
-
-		draw.Draw(drw, cursorRect.Intersect(r), imgUni, image.ZP, draw.Src)
-		return drw
-	}
-
-	nerfedCursorPos := cursorPos
+//@Todo use an id per element and an active id to tracke which element is clicked last
+// but for now just use a global variable
+var seekerPressed bool
+// try immediate ui style, still the event list should not be needed to detect drag and clicked
+// return the new position of the cursor
+func Seeker(frameCount, cursorPos int, where image.Rectangle, colorTheme *Theme, events []tomato.Ev) int {
 	if cursorPos >= frameCount && frameCount != 0 {
-		nerfedCursorPos = frameCount - 1
-	}
-	seekrImg := drawSeeker(frameCount, nerfedCursorPos)
-	tomato.ToDraw(r, seekrImg)
-
-	needRedraw := true
-	pressed := false
-	for {
-		select {
-		case newCount := <-framesCh:
-			frameCount = newCount
-			needRedraw = true
-		case newPos := <-cursorCh:
-			cursorPos = newPos
-			needRedraw = true
-		case event := <-events:
-			switch event.Kind {
-			case tomato.MouDown:
-				if event.Point.In(r) && frameCount != 0 {
-					cursorPos = int(float32(event.Point.X) / float32(RENDERER_W) * float32(frameCount))
-					seekerChanged1 <- cursorPos
-					seekerChanged2 <- cursorPos
-					pressed = true
-					needRedraw = true
-				}
-			case tomato.MouUp:
-				pressed = false
-			case tomato.MouMove:
-				if pressed && frameCount != 0 {
-					oldCursorPos := cursorPos
-					cursorPos = int(float32(event.Point.X) / float32(RENDERER_W) * float32(frameCount))
-
-					if cursorPos >= frameCount {
-						cursorPos = frameCount - 1
-					}
-
-					if cursorPos < 0 {
-						cursorPos = 0
-					}
-
-					if oldCursorPos != cursorPos {
-						needRedraw = true
-						seekerChanged1 <- cursorPos
-						seekerChanged2 <- cursorPos
-					}
-				}
-			}
-		}
-
-		if needRedraw {
-			nerfedCursorPos := cursorPos
-			if cursorPos >= frameCount && frameCount != 0 {
-				nerfedCursorPos = frameCount - 1
-			}
-
-			seekrImg = drawSeeker(frameCount, nerfedCursorPos)
-			tomato.ToDraw(r, seekrImg)
-
-			needRedraw = false
-			time.Sleep(time.Second / 300)
-		}
+		panic("cursor pos higher that frame count!")
 	}
 
-}
-
-/* Ok so we have 3 input channels,
-   the aniToggle (from the play button),
-   the seekerChanged1 (from the seeker),
-   the drawOnce (
-*/
-
-func Renderer(
-	aniToggle <-chan bool, seekerChanged1 <-chan int, drawOnce <-chan bool, // input
-	cursorCh chan<- int, seekerChanged2 chan<- int, // output
-	r image.Rectangle, animator *sim.Animator) {
-
-	drawFrame := func(i int) draw.Image {
-		drw := image.NewRGBA(r)
-		if i == 0 && len(animator.Frames) == 0 {
-			img := image.NewUniform(color.RGBA{0, 0, 0, 255})
-			draw.Draw(drw, r, img, image.ZP, draw.Src)
-			return drw
-		}
-		draw.Draw(drw, r, animator.Frames[i], image.ZP, draw.Src)
-		return drw
+	if frameCount == 0 {
+		frameCount = 1
 	}
 
-	needsRedraw := false
-	running := false
-	once := false
-	step := 0
+	rect := where.Sub(where.Min)
+	drw := image.NewRGBA(rect)
 
-	frameImg := drawFrame(step)
-	tomato.ToDraw(r, frameImg)
+	//
+	// draw background
+	//
 
-	//W 			:= RENDERER_W + PANEL_W
-	//H 	  		:= RENDERER_H + SEEKER_H + BOT_PANEL_H
+	imgUni := image.NewUniform(colorTheme.SeekerBackground)
+	draw.Draw(drw, rect, imgUni, image.ZP, draw.Src)
 
-	//env.GL() <- func() { animator.Init(W, H) }
+	//
+	// draw frame hints
+	//
 
-	// TODO: decouple animation and event loop
-	// maybe not here the lag happens! probably in other part of code
-	for {
-		select {
-		case x := <-aniToggle:
-			if !x {
-				running = false
-			} else {
-				running = !running
-			}
-		case frameNumber := <-seekerChanged1:
-			step = frameNumber
-		out:
-			for _ = range 10 {
-				time.Sleep(time.Second / 300)
-				select {
-				case fn := <-seekerChanged1:
-					step = fn
-				default:
-					break out
-				}
-			}
+	imgUni = image.NewUniform(colorTheme.SeekerFrame)
+	frameRect := rect
 
-			needsRedraw = true
-		case <-drawOnce:
-			once = true
-		default:
-			if animator != nil && !running && needsRedraw {
-				if step >= len(animator.Frames) {
-					step = 0
-				}
-				//env.Draw() <- drawFrame(step)
-				//env.GL() <- func () { animator.DrawFrame(step) }
-				frameImg = drawFrame(step)
-				tomato.ToDraw(r, frameImg)
-				needsRedraw = false
-			}
-			if (running || once) && animator != nil {
-				if step >= len(animator.Frames) {
-					step = 0
-				}
-				//env.GL() <- func() { animator.DrawFrame(step) }
-				frameImg = drawFrame(step)
-				tomato.ToDraw(r, frameImg)
+	frameDx := float32(rect.Dx()) / float32(frameCount)
 
-				cursorCh <- step
-				seekerChanged2 <- step
-				step += 1
-
-				// this is stupid and should be in the main loop
-				// the framerate should be defined in the main loop
-				time.Sleep(time.Second / 60)
-				once = false
-			}
-		}
-	}
-}
-
-func DataViewer(
-	seekerChanged <-chan int, energyProfiler <-chan float64, energyProfilerReset <-chan bool, // input
-	r image.Rectangle, colorTheme *Theme, simulation *sim.Simulation) {
-
-	redraw := func(energies []float64, cursorPos int) draw.Image {
-		drw := image.NewRGBA(r)
-
-		col := image.NewUniform(colorTheme.ProfilerForeground)
-		curCol := image.NewUniform(colorTheme.ProfilerCursor)
-		bgCol := image.NewUniform(colorTheme.ProfilerBackground)
-
-		draw.Draw(drw, r, bgCol, image.ZP, draw.Src)
-
-		frameCount := len(energies)
-
-		if frameCount == 0 {
-			return drw
-		}
-
-		minE := slices.Max(energies)
-		maxE := slices.Min(energies)
-		dE := maxE - minE
-		dx := float32(r.Dx()) / float32(frameCount+1)
-
-		// draw cursor
-		// TODO: make cursor here and in seeker behave the same
-		{
-			rect := r
-			rect.Min.X = int(dx * float32(cursorPos))
-			rect.Max.X = int(dx*float32(cursorPos)) + Max(int(dx), SEEKER_MIN_W)
-			draw.Draw(drw, rect.Intersect(r), curCol, image.ZP, draw.Src)
-		}
-
-		// draw energy scaled to height
-		rect := r
+	if frameDx <= SEEKER_MIN_W {
+		draw.Draw(drw, rect, imgUni, image.ZP, draw.Src)
+		frameDx = float32(SEEKER_MIN_W)
+	} else {
 		for i := range frameCount {
-			h := int((energies[i]-minE)/dE*float64(r.Dy())) + r.Min.Y
-			rect.Min.X = int(dx * float32(i+1))
-			rect.Max.X = int(dx * float32(i+2))
-			rect.Min.Y = h
-			rect.Max.Y = h + 2
-			draw.Draw(drw, rect, col, image.ZP, draw.Src)
+			frameRect.Min.X = int(frameDx*float32(i)) + SEEKER_PAD/2
+			frameRect.Max.X = int(frameDx*float32(i+1)) - SEEKER_PAD/2
+			draw.Draw(drw, frameRect, imgUni, image.ZP, draw.Src)
 		}
-
-		return drw
 	}
 
-	cursorPos := 0
-	energies := make([]float64, 0)
-	seekrImg := redraw(energies, cursorPos)
-	tomato.ToDraw(r, seekrImg)
+	//
+	// draw cursor
+	//
 
-	for {
-		select {
-		case cursorPos = <-seekerChanged:
-			seekrImg := redraw(energies, cursorPos)
-			tomato.ToDraw(r, seekrImg)
-		case energy := <-energyProfiler:
-			energies = append(energies, energy)
-			seekrImg := redraw(energies, cursorPos)
-			tomato.ToDraw(r, seekrImg)
-		case <-energyProfilerReset:
-			energies = energies[:0]
-			cursorPos = 0
-			seekrImg := redraw(energies, cursorPos)
-			tomato.ToDraw(r, seekrImg)
+	imgUni = image.NewUniform(colorTheme.SeekerCursor)
+
+	cursorW := Min(int(frameDx), int(SEEKER_W))
+	cursorOffset := image.Point{int(frameDx/2 - float32(cursorW)/2), 0}
+	cursorRect := rect
+	cursorRect.Min.X = int((float32(rect.Dx()) / float32(frameCount)) * float32(cursorPos))
+	cursorRect.Max.X = cursorRect.Min.X + cursorW
+	cursorRect = cursorRect.Add(cursorOffset)
+
+	draw.Draw(drw, cursorRect.Intersect(rect), imgUni, image.ZP, draw.Src)
+	tomato.ToDraw(where, drw)
+
+	// check for drag, click and return the updated cursor pos
+	for _, event := range events {
+		switch event.Kind {
+		case tomato.MouDown:
+			if event.Point.In(where) && frameCount != 0 {
+				cursorPos = int(float32(event.Point.X) / float32(RENDERER_W) * float32(frameCount))
+				seekerPressed = true
+			}
+		// @Todo might be problematic beacuse the MouUp event might never arrive!
+		case tomato.MouUp:
+			seekerPressed = false
+		case tomato.MouMove:
+			if seekerPressed && frameCount != 0 {
+				cursorPos = int(float32(event.Point.X) / float32(RENDERER_W) * float32(frameCount))
+
+				if cursorPos >= frameCount {
+					cursorPos = frameCount - 1
+				}
+
+				if cursorPos < 0 {
+					cursorPos = 0
+				}
+			}
 		}
+	}
+
+	return cursorPos
+}
+
+
+func (dv *Dv) DrawDataViewer(cursorPos int, colorTheme *Theme, where image.Rectangle) {
+	rect := where.Sub(where.Min)
+	drw := image.NewRGBA(rect)
+
+	col := image.NewUniform(colorTheme.ProfilerForeground)
+	curCol := image.NewUniform(colorTheme.ProfilerCursor)
+	bgCol := image.NewUniform(colorTheme.ProfilerBackground)
+
+	draw.Draw(drw, rect, bgCol, image.ZP, draw.Src)
+
+	frameCount := len(dv.Energies)
+
+	if frameCount == 0 {
+		return
+	}
+
+	minE := slices.Max(dv.Energies)
+	maxE := slices.Min(dv.Energies)
+	dE := maxE - minE
+	dx := float32(rect.Dx()) / float32(frameCount+1)
+
+	// draw cursor
+	// TODO: make cursor here and in seeker behave the same
+	{
+		rectC := rect
+		rectC.Min.X = int(dx*float32(cursorPos))
+		rectC.Max.X = int(dx*float32(cursorPos)) + Max(int(dx), SEEKER_MIN_W)
+		draw.Draw(drw, rectC.Intersect(rect), curCol, image.ZP, draw.Src)
+	}
+
+	// draw energy scaled to height
+	rectC := rect
+	for i := range frameCount {
+		h := int((dv.Energies[i]-minE)/dE*float64(rect.Dy())) + rect.Min.Y
+		rectC.Min.X = int(dx * float32(i+1))
+		rectC.Max.X = int(dx * float32(i+2))
+		rectC.Min.Y = h
+		rectC.Max.Y = h + 2
+		draw.Draw(drw, rectC, col, image.ZP, draw.Src)
+	}
+
+	tomato.ToDraw(where, drw)
+}
+
+func (dv *Dv) Reset() {
+	dv.Energies = dv.Energies[:0]
+}
+
+func (dv *Dv) AddValue(v float64) {
+	dv.Energies = append(dv.Energies, v)
+}
+
+func MakeDv() Dv {
+	return Dv{
+		Label: "Energy",
 	}
 }
 
+// @Todo rename
+type Dv struct {
+	Label string
+	Energies []float64
+}
 
 func ConfigChoser(events chan tomato.Ev, configFolder string, r image.Rectangle, colorTheme *Theme, mu *sync.Mutex, callback func(string)) {
 
