@@ -82,6 +82,7 @@ type SimviewerState struct {
 	CursorPos int
 	AnimationRunning bool
 	CurrentFrame image.Image
+	TermMsg string
 }
 
 var svState SimviewerState
@@ -90,7 +91,7 @@ func run() {
 	W := RENDERER_W + PANEL_W
 	H := RENDERER_H + SEEKER_H + BOT_PANEL_H
 
-	var fontMu sync.Mutex
+	//var fontMu sync.Mutex
 	var fontFace font.Face
 	{
 		font, err := truetype.Parse(gomono.TTF)
@@ -156,12 +157,11 @@ func run() {
 
 	simulationToggle := make(chan bool) // if false is sent it turns it off
 	energyProfiler := make(chan float64)
-	msgStream := make(chan string)
 
 
 	//energyProfilerReset := make(chan bool)
 	//drawOnce := make(chan bool)
-	
+
 	// Event Fowarding Channels
 	// @Todo make this behind some abstraction maybe?
 	//forwarding := make([]chan tomato.Ev, 7)
@@ -170,9 +170,6 @@ func run() {
 	//	forwarding[i] = make(chan tomato.Ev)
 	//}
 	
-	go Terminal(
-		image.Rect(W-PANEL_W, RENDERER_H, W, H),
-		colorTheme, &fontMu, msgStream)
 
 	// create example config file if not existent
 	exampleConfigFilePaths := [2]string{"example.sph-config", "tube.sph-config"}
@@ -180,13 +177,14 @@ func run() {
 
 	err, simulation := sim.MakeSimulationFromConfig(exampleConfigFilePaths[0])
 	if err != nil {
-		msgStream <- fmt.Sprintf("%v", err)
+		svState.TermMsg = fmt.Sprintf("%v", err)
 	} else {
-		msgStream <- fmt.Sprintf("!loaded `%v` sucessfully  (Hint: config files are in the same directory as this program!) ", exampleConfigFilePaths[0])
+		svState.TermMsg = fmt.Sprintf("!loaded `%v` sucessfully  (Hint: config files are in the same directory as this program!) ", exampleConfigFilePaths[0])
 	}
 
 	animator := sim.MakeAnimator(&simulation)
 	//animator   := sim.MakeAnimatorGL(&simulation)
+
 	go Simulator(simulationToggle, energyProfiler, &simulation, &animator)
 
 	/*
@@ -230,7 +228,6 @@ func run() {
 	svState.CurrentFrame = animator.Frames[svState.CursorPos]
 	dataViewer := MakeDv()
 
-
 	tomato.SetupUi()
 	for tomato.Alive() {
 
@@ -260,6 +257,9 @@ func run() {
 				break events_loop
 			}
 		}
+
+		// Terminal
+		Terminal(image.Rect(W-PANEL_W, RENDERER_H, W, H), colorTheme, svState.TermMsg)
 
 		// Seeker
 		where := image.Rect(0, RENDERER_H, RENDERER_W, RENDERER_H+SEEKER_H)
@@ -497,6 +497,8 @@ type Dv struct {
 	Energies []float64
 }
 
+
+
 func ConfigChoser(events chan tomato.Ev, configFolder string, r image.Rectangle, colorTheme *Theme, mu *sync.Mutex, callback func(string)) {
 
 	entries, err := os.ReadDir(configFolder)
@@ -598,41 +600,42 @@ func ConfigChoser(events chan tomato.Ev, configFolder string, r image.Rectangle,
 	tomato.ToDraw(r, image.NewUniform(colorTheme.Background))
 }
 
-func Terminal(r image.Rectangle, colorTheme *Theme, mu *sync.Mutex, messageStream <-chan string) {
+type Terminal_Info struct {
+	Surface image.Image
+	LastMsg string
+}
 
-	redraw := func(msg string, sucess bool) draw.Image {
-		drw := image.NewRGBA(r)
-		bg := image.NewUniform(colorTheme.TermBackground)
-		draw.Draw(drw, r, bg, image.ZP, draw.Src)
+var ti Terminal_Info
 
-		textColor := colorTheme.ErrorRed
-		if sucess {
-			textColor = colorTheme.SuccessGreen
-		}
+func Terminal(r image.Rectangle, colorTheme *Theme, message string) {
 
-		textImage := RenderTextMulti(msg, textColor, colorTheme.TermBackground, colorTheme.FontFaceTerm, r.Dx())
-		textRect := r
-		draw.Draw(drw, textRect, textImage, textImage.Bounds().Min, draw.Src)
-		return drw
-	}
+	if message != ti.LastMsg || ti.Surface == nil {
+		redraw := func(msg string, sucess bool) draw.Image {
+			rect := r.Sub(r.Min)
+			drw := image.NewRGBA(rect)
+			bg := image.NewUniform(colorTheme.TermBackground)
+			draw.Draw(drw, rect, bg, image.ZP, draw.Src)
 
-	var termImg image.Image
-	for {
-		select {
-		case msg := <-messageStream:
-			fmt.Println(msg)
-			if rune(msg[0]) == '!' {
-				termImg = redraw(msg[1:], true)
-				tomato.ToDraw(r, termImg)
-			} else {
-				termImg = redraw(msg, false)
-				tomato.ToDraw(r, termImg)
+			textColor := colorTheme.ErrorRed
+			if sucess {
+				textColor = colorTheme.SuccessGreen
 			}
-		default:
-			time.Sleep(time.Second / 10)
+
+			textImage := RenderTextMulti(msg, textColor, colorTheme.TermBackground, colorTheme.FontFaceTerm, rect.Dx())
+			textRect := rect
+			draw.Draw(drw, textRect, textImage, textImage.Bounds().Min, draw.Src)
+			return drw
+		}
+
+		ti.LastMsg = message
+		if rune(message[0]) == '!' {
+			ti.Surface = redraw(message[1:], true)
+		} else {
+			ti.Surface = redraw(message, false)
 		}
 	}
 
+	tomato.ToDraw(r, ti.Surface)
 }
 
 func RenderText(text string, textColor, btnColor color.RGBA, fontFace font.Face) draw.Image {
