@@ -214,3 +214,9 @@ To run all tests (Partition(), BoundingSpheres() covered for now):
 ```console
 go test -v ./...
 ```
+
+## Release Build
+
+```console
+ go build -ldflags="-s -w -H=windowsgui" .\simviewer\
+```
