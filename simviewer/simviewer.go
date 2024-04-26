@@ -51,14 +51,8 @@ const (
 type Theme struct {
 	Background color.RGBA
 
-	ButtonText  color.RGBA
-	ButtonUp    color.RGBA
-	ButtonHover color.RGBA
-	ButtonBlink color.RGBA
-
-	OptionText  color.RGBA
-	OptionUp    color.RGBA
-	OptionHover color.RGBA
+	ButtonTheme        tomato.ButtonColorTheme
+	ButtonChooserTheme tomato.ButtonColorTheme
 
 	TermBackground color.RGBA
 	ErrorRed       color.RGBA
@@ -72,20 +66,22 @@ type Theme struct {
 	ProfilerBackground color.RGBA
 	ProfilerCursor     color.RGBA
 
-	FontFace     font.Face
-	FontFaceTerm font.Face
+	MainFont font.Face
+	TermFont font.Face
 }
-
 
 // slowly migrating to this
 type SimviewerState struct {
-	CursorPos int
-	AnimationRunning bool
-	CurrentFrame image.Image
-	TermMsg string
+	CursorPos           int
+	AnimationRunning    bool
+	ConfigChooserOpened bool
+	CurrentFrame        image.Image
+	TermMsg             string
 }
 
 var svState SimviewerState
+var dataViewer DataViewInfo
+
 func run() {
 
 	W := RENDERER_W + PANEL_W
@@ -119,18 +115,24 @@ func run() {
 	colorTheme := &Theme{
 		Background: color.RGBA{24, 24, 24, 255},
 
-		ButtonText:  color.RGBA{255, 250, 240, 255}, // Floral White
-		ButtonUp:    color.RGBA{36, 33, 36, 255},    // Raisin Black
-		ButtonHover: color.RGBA{45, 45, 45, 255},
-		ButtonBlink: color.RGBA{70, 70, 70, 255},
+		ButtonTheme: tomato.ButtonColorTheme{
+			Text:     color.RGBA{255, 250, 240, 255}, // Floral White
+			BgUp:     color.RGBA{36, 33, 36, 255},    // Raisin Black
+			BgHover:  color.RGBA{45, 45, 45, 255},
+			FontFace: fontFace,
+		},
+		ButtonChooserTheme: tomato.ButtonColorTheme{
+			Text:     color.RGBA{36, 33, 36, 255},    // Raisin Black
+			BgUp:     color.RGBA{255, 250, 240, 255}, // Floral White
+			BgHover:  color.RGBA{240, 220, 200, 255},
+			FontFace: fontFace,
+		},
+
+		//ButtonBlink: color.RGBA{70, 70, 70, 255},
 
 		TermBackground: color.RGBA{36, 23, 36, 255},
 		ErrorRed:       color.RGBA{220, 60, 50, 255},
 		SuccessGreen:   color.RGBA{60, 220, 23, 255},
-
-		OptionText:  color.RGBA{36, 33, 36, 255},    // Raisin Black
-		OptionUp:    color.RGBA{255, 250, 240, 255}, // Floral White
-		OptionHover: color.RGBA{240, 220, 200, 255},
 
 		SeekerFrame:      color.RGBA{140, 0, 0, 255},
 		SeekerBackground: color.RGBA{120, 0, 30, 255},
@@ -140,36 +142,15 @@ func run() {
 		ProfilerBackground: color.RGBA{24, 24, 24, 255},
 		ProfilerCursor:     color.RGBA{48, 48, 48, 255},
 
-		FontFace:     fontFace,
-		FontFaceTerm: fontFaceTerm,
+		MainFont: fontFace,
+		TermFont: fontFaceTerm,
 	}
 
 	if err := tomato.Create(W, H, "SFUGO - Simulation Renderer"); err != nil {
 		panic(err)
 	}
 
-	/*w.Draw() <- func(drw draw.Image) image.Rectangle {
-		r := image.Rect(0, 0, W, H)
-		backgroundImg := image.NewUniform(colorTheme.Background)
-		draw.Draw(drw, r, backgroundImg, image.ZP, draw.Src)
-		return r
-	}*/
-
 	simulationToggle := make(chan bool) // if false is sent it turns it off
-	energyProfiler := make(chan float64)
-
-
-	//energyProfilerReset := make(chan bool)
-	//drawOnce := make(chan bool)
-
-	// Event Fowarding Channels
-	// @Todo make this behind some abstraction maybe?
-	//forwarding := make([]chan tomato.Ev, 7)
-	//forwarding_boxes := make([]image.Rectangle, len(forwarding))
-	//for i := range forwarding {
-	//	forwarding[i] = make(chan tomato.Ev)
-	//}
-	
 
 	// create example config file if not existent
 	exampleConfigFilePaths := [2]string{"example.sph-config", "tube.sph-config"}
@@ -183,50 +164,16 @@ func run() {
 	}
 
 	animator := sim.MakeAnimator(&simulation)
-	//animator   := sim.MakeAnimatorGL(&simulation)
 
-	go Simulator(simulationToggle, energyProfiler, &simulation, &animator)
-
-	/*
-	xa := W - PANEL_W
-	xb := W
-
-	go Button("Load Configuration", colorTheme,
-		forwarding[4],
-		image.Rect(xa, 4*(BTN_H+MARGIN_BOT), xb, 4*(BTN_H+MARGIN_BOT)+BTN_H),
-		&fontMu, func() {
-			go ConfigChoser(forwarding[5],
-				"./",
-				image.Rect(xa, 5*(BTN_H+MARGIN_BOT), xb, RENDERER_H),
-				colorTheme,
-				&fontMu,
-				func(configPath string) {
-					//simulationToggle <- false
-					//animationToggle <- false
-					err, simulation = sim.MakeSimulationFromConfig(configPath)
-					if err != nil {
-						msgStream <- fmt.Sprintf("%v", err)
-					} else {
-						msgStream <- fmt.Sprintf("!loaded `%v` sucessfully!", configPath)
-					}
-
-					//seekerChanged1 <- 0
-					//animator   = sim.MakeAnimator(&simulation)
-					//animator = sim.MakeAnimatorGL(&simulation)
-					//env.GL() <- func() { animator.Init(W, H) }
-
-					//drawOnce <- true
-					//energyProfilerReset <- true
-					//framesChanged <- 1
-				})
-		})*/
+	go Simulator(simulationToggle, &simulation, &animator)
 
 	tick := 0
 	eventsThisTick := make([]tomato.Ev, 0)
 	previousTime := time.Now()
+	previousTimeActually := time.Now()
 
 	svState.CurrentFrame = animator.Frames[svState.CursorPos]
-	dataViewer := MakeDv()
+	configFiles := ListAvailableConfigFiles(".")
 
 	tomato.SetupUi()
 	for tomato.Alive() {
@@ -234,7 +181,7 @@ func run() {
 		//fmt.Println(tick)
 		eventsThisTick = eventsThisTick[:0]
 
-		events_loop:
+	events_loop:
 		for {
 			select {
 			case event := <-tomato.Events():
@@ -251,10 +198,56 @@ func run() {
 					tomato.MouMove:
 					eventsThisTick = append(eventsThisTick, event)
 				}
-			case energyChanged := <-energyProfiler:
-				dataViewer.AddValue(energyChanged)
 			default:
 				break events_loop
+			}
+		}
+
+		{
+			tomato.Layout(0, tomato.Vertical, image.Rect(W-PANEL_W, 0, W, RENDERER_H))
+
+			if tomato.TextButton(0, "Run/Stop Simulation", &colorTheme.ButtonTheme) {
+				// race occurs here, for now we just async call the toggle to not block here
+				// it feels kinda slower now ... but not so sure
+				go func() { simulationToggle <- true }()
+				//simulationToggle <- true
+			}
+
+			if tomato.TextButton(1, "Play/Pause Animation", &colorTheme.ButtonTheme) {
+				svState.AnimationRunning = !svState.AnimationRunning
+			}
+
+			tomato.TextButton(2, "Render to .mp4", &colorTheme.ButtonTheme)
+			tomato.TextButton(3, "Current Frame to .png", &colorTheme.ButtonTheme)
+			if tomato.TextButton(4, "Load Configuration", &colorTheme.ButtonTheme) {
+				svState.ConfigChooserOpened = !svState.ConfigChooserOpened
+				if svState.ConfigChooserOpened {
+					configFiles = ListAvailableConfigFiles(".")
+					tomato.InvalidateElements() // Preamtively delete all buttons in this layout for later redraw
+				}
+			}
+
+			if svState.ConfigChooserOpened {
+				for i, configPath := range configFiles {
+					if tomato.TextButton(5+i, configPath, &colorTheme.ButtonChooserTheme) {
+						svState.ConfigChooserOpened = false
+						simulationToggle <- false
+
+						err, simulation = sim.MakeSimulationFromConfig(configPath)
+						if err != nil {
+							svState.TermMsg = fmt.Sprintf("%v", err)
+						} else {
+							svState.TermMsg = fmt.Sprintf("!loaded `%v` sucessfully!", configPath)
+						}
+						animator = sim.MakeAnimator(&simulation)
+						svState.CurrentFrame = animator.Frames[0]
+						svState.CursorPos = 0
+						svState.AnimationRunning = false
+						dataViewer.Mutex.Lock()
+						dataViewer.Values = dataViewer.Values[:0]
+						dataViewer.Mutex.Unlock()
+					}
+				}
 			}
 		}
 
@@ -265,59 +258,46 @@ func run() {
 		where := image.Rect(0, RENDERER_H, RENDERER_W, RENDERER_H+SEEKER_H)
 		cursorPosBefore := svState.CursorPos
 		svState.CursorPos = Seeker(len(animator.Frames),
-											svState.CursorPos,
-											where,
-											colorTheme,
-											eventsThisTick)
+			svState.CursorPos,
+			where,
+			colorTheme,
+			eventsThisTick)
 		if cursorPosBefore != svState.CursorPos {
 			svState.CurrentFrame = animator.Frames[svState.CursorPos]
 		}
 
+		// DataViewer
 		dvWhere := image.Rect(0, RENDERER_H+SEEKER_H, RENDERER_W, RENDERER_H+SEEKER_H+BOT_PANEL_H)
 		dataViewer.DrawDataViewer(svState.CursorPos, colorTheme, dvWhere)
 
+		// Frame
 		if svState.AnimationRunning {
 			svState.CursorPos = (svState.CursorPos + 1) % len(animator.Frames)
 			svState.CurrentFrame = animator.Frames[svState.CursorPos]
 		}
 		tomato.ToDraw(image.Rect(0, 0, RENDERER_W, RENDERER_H), svState.CurrentFrame)
 
-		{
-			tomato.Layout(0, tomato.Vertical, image.Rect(W - PANEL_W, 0, W, RENDERER_H))
-
-			if tomato.TextButton(0, "Run/Stop Simulation") {
-				// race occurs here, for now we just async call the toggle to not block here
-				// it feels kinda slower now ... but not so sure
-				go func() {simulationToggle <- true}()
-				//simulationToggle <- true
-			}
-
-			if tomato.TextButton(1, "Play/Pause Animation") {
-				svState.AnimationRunning = !svState.AnimationRunning
-			}
-			tomato.TextButton(2, "Render to .mp4")
-			tomato.TextButton(3, "Current Frame to .png")
-			tomato.TextButton(4, "Load Configuration")
-		}
-
 		tomato.DrawUi()
 		tomato.Win.SwapBuffers()
 		tomato.Clear()
 
-		dt := time.Now().Sub(previousTime)
+		// FPS target does actually not work correctly... the real fps are lower thean requeseted..
+		dt := time.Since(previousTime)
+		const desiredFrameTime time.Duration = time.Second / 120
+		if dt < desiredFrameTime {
+			time.Sleep(desiredFrameTime - dt)
+		}
+
+		// is measureing correct?
+		fmt.Printf("FPS %.4v\n", 1.0/time.Since(previousTimeActually).Seconds())
+		previousTimeActually = time.Now()
 		previousTime = time.Now()
-		_ = dt
-		fmt.Printf("%.3v FPS\n", 1/dt.Seconds())
-		time.Sleep(time.Second / 120)
 		tick++
 	}
 }
 
 // Background Process for starting/stopping simulation
-func Simulator(
-	simToggle <-chan bool, // input
-	energyProfiler chan<- float64, // output
-	simulation *sim.Simulation, animator *sim.Animator) {
+func Simulator(simToggle <-chan bool, simulation *sim.Simulation, animator *sim.Animator) {
 	running := false
 	for {
 		select {
@@ -334,18 +314,20 @@ func Simulator(
 				energy := simulation.TotalEnergy()
 				//energy := simulation.TotalDensity()
 				animator.Frame()
-				//animator.AddFrame()
-				energyProfiler <- energy
+
+				dataViewer.Mutex.Lock()
+				dataViewer.Values = append(dataViewer.Values, energy)
+				dataViewer.Mutex.Unlock()
 			}
-			time.Sleep(time.Second / 100)
 		}
+		time.Sleep(time.Second / 960)
 	}
 }
 
-
-//@Todo use an id per element and an active id to tracke which element is clicked last
+// @Todo use an id per element and an active id to tracke which element is clicked last
 // but for now just use a global variable
 var seekerPressed bool
+
 // try immediate ui style, still the event list should not be needed to detect drag and clicked
 // return the new position of the cursor
 func Seeker(frameCount, cursorPos int, where image.Rectangle, colorTheme *Theme, events []tomato.Ev) int {
@@ -432,8 +414,7 @@ func Seeker(frameCount, cursorPos int, where image.Rectangle, colorTheme *Theme,
 	return cursorPos
 }
 
-
-func (dv *Dv) DrawDataViewer(cursorPos int, colorTheme *Theme, where image.Rectangle) {
+func (dv *DataViewInfo) DrawDataViewer(cursorPos int, colorTheme *Theme, where image.Rectangle) {
 	rect := where.Sub(where.Min)
 	drw := image.NewRGBA(rect)
 
@@ -443,64 +424,47 @@ func (dv *Dv) DrawDataViewer(cursorPos int, colorTheme *Theme, where image.Recta
 
 	draw.Draw(drw, rect, bgCol, image.ZP, draw.Src)
 
-	frameCount := len(dv.Energies)
-
-	if frameCount == 0 {
+	if len(dv.Values) == 0 {
 		return
 	}
 
-	minE := slices.Max(dv.Energies)
-	maxE := slices.Min(dv.Energies)
-	dE := maxE - minE
-	dx := float32(rect.Dx()) / float32(frameCount+1)
+	dv.Mutex.Lock()
+	minV := slices.Max(dv.Values)
+	maxV := slices.Min(dv.Values)
+	dV := maxV - minV
+	dx := float32(rect.Dx()) / float32(len(dv.Values)+1)
 
 	// draw cursor
 	// TODO: make cursor here and in seeker behave the same
 	{
 		rectC := rect
-		rectC.Min.X = int(dx*float32(cursorPos))
+		rectC.Min.X = int(dx * float32(cursorPos))
 		rectC.Max.X = int(dx*float32(cursorPos)) + Max(int(dx), SEEKER_MIN_W)
 		draw.Draw(drw, rectC.Intersect(rect), curCol, image.ZP, draw.Src)
 	}
 
 	// draw energy scaled to height
 	rectC := rect
-	for i := range frameCount {
-		h := int((dv.Energies[i]-minE)/dE*float64(rect.Dy())) + rect.Min.Y
+	for i := range len(dv.Values) {
+		h := int((dv.Values[i]-minV)/dV*float64(rect.Dy())) + rect.Min.Y
 		rectC.Min.X = int(dx * float32(i+1))
 		rectC.Max.X = int(dx * float32(i+2))
 		rectC.Min.Y = h
 		rectC.Max.Y = h + 2
 		draw.Draw(drw, rectC, col, image.ZP, draw.Src)
 	}
+	dv.Mutex.Unlock()
 
 	tomato.ToDraw(where, drw)
 }
 
-func (dv *Dv) Reset() {
-	dv.Energies = dv.Energies[:0]
+type DataViewInfo struct {
+	Label  string
+	Values []float64
+	Mutex  sync.Mutex
 }
 
-func (dv *Dv) AddValue(v float64) {
-	dv.Energies = append(dv.Energies, v)
-}
-
-func MakeDv() Dv {
-	return Dv{
-		Label: "Energy",
-	}
-}
-
-// @Todo rename
-type Dv struct {
-	Label string
-	Energies []float64
-}
-
-
-
-func ConfigChoser(events chan tomato.Ev, configFolder string, r image.Rectangle, colorTheme *Theme, mu *sync.Mutex, callback func(string)) {
-
+func ListAvailableConfigFiles(configFolder string) []string {
 	entries, err := os.ReadDir(configFolder)
 	if err != nil {
 		panic(err)
@@ -512,92 +476,7 @@ func ConfigChoser(events chan tomato.Ev, configFolder string, r image.Rectangle,
 			configFilePaths = append(configFilePaths, e.Name())
 		}
 	}
-
-	// make textures for options
-	textImagesUp    := make([]image.Image, 0, len(configFilePaths))
-	textImagesHover := make([]image.Image, 0, len(configFilePaths))
-	for _, path := range configFilePaths {
-		text := path
-		var textImageUp    image.Image
-		var textImageHover image.Image
-		{
-			mu.Lock()
-			textImageUp    = RenderText(text, colorTheme.OptionText, colorTheme.OptionUp, colorTheme.FontFace)
-			textImageHover = RenderText(text, colorTheme.OptionText, colorTheme.OptionHover, colorTheme.FontFace)
-			mu.Unlock()
-		}
-		textImagesUp    = append(textImagesUp, textImageUp)
-		textImagesHover = append(textImagesHover, textImageHover)
-	}
-
-
-	drawOption := func(index int) (draw.Image, draw.Image, image.Rectangle) {
-
-		rect := r
-		rect.Min.Y = r.Min.Y + index * OPTION_H
-		rect.Max.Y = r.Min.Y + (index + 1)  * OPTION_H - OPTION_PAD
-
-		textBounds := textImagesUp[index].Bounds()
-		var buttonBgHover  = image.NewUniform(colorTheme.OptionHover)
-		var buttonBgUp  = image.NewUniform(colorTheme.OptionUp)
-
-		drwUp    := image.NewRGBA(r)
-		drwHover := image.NewRGBA(r)
-		
-		draw.Draw(drwUp,    rect, buttonBgUp, image.ZP, draw.Src)
-		draw.Draw(drwHover, rect, buttonBgHover, image.ZP, draw.Src)
-
-		textRect := rect
-		textRect.Min.Y += textRect.Dy()/2 - textBounds.Dy()/2
-		textRect.Min.X += textRect.Dx()/2 - textBounds.Dx()/2
-
-		draw.Draw(drwUp, textRect, textImagesUp[index], textBounds.Min, draw.Src)
-		
-		draw.Draw(drwHover, textRect, textImagesHover[index], textBounds.Min, draw.Src)
-		
-		return drwUp, drwHover, rect
-	}
-
-	var optionsHover []draw.Image
-	var optionsUp    []draw.Image
-	var optionsRects []image.Rectangle
-
-	for i := range configFilePaths {
-		u, h, r := drawOption(i) 
-		optionsHover = append(optionsHover, h)
-		optionsUp    = append(optionsUp, u)
-		optionsRects = append(optionsRects, r)
-		tomato.ToDraw(r, u)
-	}
-
-	over := -1
-
-	exit:
-	for event := range events {
-		switch event.Kind {
-		case tomato.MouDown:
-			i := (event.Point.Y - r.Min.Y) / OPTION_H
-			if event.Point.In(r) && i >= 0 && i < len(configFilePaths) {
-				callback(configFilePaths[i])
-				break exit
-			}
-		case tomato.MouMove:
-			if event.Point.In(r) {
-				supposedIndex := (event.Point.Y - r.Min.Y) / OPTION_H
-				if supposedIndex != over && supposedIndex >= 0 && supposedIndex < len(configFilePaths){
-					tomato.ToDraw(optionsRects[supposedIndex], optionsHover[supposedIndex])
-					if over >= 0 {
-						tomato.ToDraw(optionsRects[over], optionsUp[over])
-					}
-					over = supposedIndex
-				}
-			}
-		}
-	}
-
-	fmt.Println(len(optionsHover))
-
-	tomato.ToDraw(r, image.NewUniform(colorTheme.Background))
+	return configFilePaths
 }
 
 type Terminal_Info struct {
@@ -621,7 +500,7 @@ func Terminal(r image.Rectangle, colorTheme *Theme, message string) {
 				textColor = colorTheme.SuccessGreen
 			}
 
-			textImage := RenderTextMulti(msg, textColor, colorTheme.TermBackground, colorTheme.FontFaceTerm, rect.Dx())
+			textImage := tomato.RenderTextMulti(msg, textColor, colorTheme.TermBackground, colorTheme.TermFont, rect.Dx())
 			textRect := rect
 			draw.Draw(drw, textRect, textImage, textImage.Bounds().Min, draw.Src)
 			return drw
@@ -659,125 +538,6 @@ func RenderText(text string, textColor, btnColor color.RGBA, fontFace font.Face)
 	draw.Draw(drawer.Dst, bounds, btnUpUniform, image.ZP, draw.Src)
 	drawer.DrawString(text)
 	return drawer.Dst
-}
-
-func RenderTextMulti(text string, textColor, bgColor color.RGBA, fontFace font.Face, maxWidth int) draw.Image {
-
-	drawer := &font.Drawer{
-		Src:  &image.Uniform{textColor},
-		Face: fontFace,
-		Dot:  fixed.P(0, 0),
-	}
-
-	lines := make([]string, 0)
-
-	j := 0
-	i := 0
-	for i = 0; i < len(text)-1; i++ {
-		b26_6, _ := drawer.BoundString(text[j : i+1])
-		if b26_6.Max.X.Ceil()-b26_6.Min.X.Floor() > maxWidth {
-			lines = append(lines, text[j:i])
-			j = i
-		}
-	}
-
-	if i != j {
-		lines = append(lines, text[j:i])
-	}
-
-	maxW := 0
-	lineH := 0
-	for _, line := range lines {
-		b26_6, _ := drawer.BoundString(line)
-		bounds := image.Rect(
-			b26_6.Min.X.Floor(),
-			b26_6.Min.Y.Floor(),
-			b26_6.Max.X.Ceil(),
-			b26_6.Max.Y.Ceil(),
-		)
-		if bounds.Dx() > maxW {
-			maxW = bounds.Dx()
-		}
-		if bounds.Dy() > lineH {
-			lineH = bounds.Dy()
-		}
-	}
-
-	bounds := image.Rect(0, 0, maxW, (len(lines)+1)*lineH)
-	result := image.NewRGBA(bounds)
-	bgUniform := image.NewUniform(bgColor)
-	draw.Draw(result, bounds, bgUniform, image.ZP, draw.Src)
-
-	for i, line := range lines {
-		tImage := RenderText(line, textColor, bgColor, fontFace)
-		draw.Draw(result, bounds, tImage, bounds.Min.Sub(image.Pt(0, lineH*(i+1))), draw.Src)
-	}
-	return result
-}
-
-func Button(text string, colorTheme *Theme,
-	events chan tomato.Ev,
-	r image.Rectangle, mu *sync.Mutex, clicked func()) {
-
-	var textImageUp image.Image
-	var textImageHover image.Image
-	{
-		mu.Lock()
-		textImageUp = RenderText(text, colorTheme.ButtonText, colorTheme.ButtonUp, colorTheme.FontFace)
-		textImageHover = RenderText(text, colorTheme.ButtonText, colorTheme.ButtonHover, colorTheme.FontFace)
-		mu.Unlock()
-	}
-
-	redraw := func(visible bool, hover bool) draw.Image {
-		img := image.NewRGBA(r)
-		var textImage image.Image
-		var buttonBg image.Image
-		if hover {
-			buttonBg = image.NewUniform(colorTheme.ButtonHover)
-			textImage = textImageHover
-		} else {
-			buttonBg = image.NewUniform(colorTheme.ButtonUp)
-			textImage = textImageUp
-		}
-		if visible {
-			draw.Draw(img, r, buttonBg, image.ZP, draw.Src)
-			textRect := r
-			textRect.Min.Y += textRect.Dy()/2 - textImage.Bounds().Dy()/2
-			textRect.Min.X += textRect.Dx()/2 - textImage.Bounds().Dx()/2
-
-			draw.Draw(img, textRect, textImage, textImage.Bounds().Min, draw.Src)
-		} else {
-			draw.Draw(img, r, image.NewUniform(colorTheme.ButtonBlink), image.ZP, draw.Src)
-		}
-		return img
-	}
-
-	normalImg := redraw(true, false)
-	hoveredImg := redraw(true, true)
-	blinkImg := redraw(false, false)
-
-	tomato.ToDraw(r, normalImg)
-
-	for ev := range events {
-		if ev.Kind == tomato.MouMove {
-			if ev.Point.In(r) {
-				tomato.ToDraw(r, hoveredImg)
-			} else {
-				tomato.ToDraw(r, normalImg)
-			}
-		}
-		if ev.Kind == tomato.MouDown {
-			if ev.Point.In(r) {
-				clicked()
-				for i := 0; i < 3; i++ {
-					tomato.ToDraw(r, blinkImg)
-					time.Sleep(time.Second / 10)
-					tomato.ToDraw(r, hoveredImg)
-					time.Sleep(time.Second / 10)
-				}
-			}
-		}
-	}
 }
 
 func Min(a, b int) int {
