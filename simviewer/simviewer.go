@@ -89,17 +89,6 @@ func run() {
 
 	//var fontMu sync.Mutex
 	var fontFace font.Face
-	{
-		font, err := truetype.Parse(gomono.TTF)
-		if err != nil {
-			panic(err)
-		}
-
-		fontFace = truetype.NewFace(font, &truetype.Options{
-			Size: TEXT_SIZE,
-		})
-	}
-
 	var fontFaceTerm font.Face
 	{
 		font, err := truetype.Parse(gomono.TTF)
@@ -107,9 +96,8 @@ func run() {
 			panic(err)
 		}
 
-		fontFaceTerm = truetype.NewFace(font, &truetype.Options{
-			Size: TERM_TEXT_SIZE,
-		})
+		fontFace = truetype.NewFace(font, &truetype.Options{Size: TEXT_SIZE})
+		fontFaceTerm = truetype.NewFace(font, &truetype.Options{Size: TERM_TEXT_SIZE})
 	}
 
 	colorTheme := &Theme{
