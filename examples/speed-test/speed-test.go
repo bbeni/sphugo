@@ -1,14 +1,12 @@
 package main
 
 import (
-	"github.com/bbeni/sphugo/sim"
 	"fmt"
-	"time"
-	"runtime/pprof"
+	"github.com/bbeni/sphugo/sim"
 	"os"
+	"runtime/pprof"
+	"time"
 )
-
-
 
 func main() {
 
@@ -20,7 +18,6 @@ func main() {
 
 	pprof.StartCPUProfile(f)
 	defer pprof.StopCPUProfile()
-
 
 	spwn := sim.MakeUniformRectSpawner()
 	spwn.NParticles = 100000

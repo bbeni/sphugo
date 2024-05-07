@@ -1,27 +1,27 @@
 package sim
 
 import (
-	"math"
 	"log"
+	"math"
+
 	//"time"
-    "fmt"
-    "sync"
+	"fmt"
+	"sync"
 )
 
 var _ = fmt.Print
 
 type Simulation struct {
-
 	Config SphConfig
 
-	Root *Cell // Tree structure for keeping track of spatial cells of particles
+	Root        *Cell // Tree structure for keeping track of spatial cells of particles
 	CurrentStep int
 
-	IsBusy  sync.Mutex
+	IsBusy sync.Mutex
 }
 
-func MakeSimulation() (Simulation){
-	sim := Simulation {
+func MakeSimulation() Simulation {
+	sim := Simulation{
 		Config: MakeConfig(),
 	}
 	spawner := MakeUniformRectSpawner()
@@ -29,17 +29,17 @@ func MakeSimulation() (Simulation){
 	return sim
 }
 
-func MakeSimulationFromConfig(configFilePath string) (error, Simulation) {
-	err, conf:= MakeConfigFromFile(configFilePath)
+func MakeSimulationFromConfig(configFilePath string) (Simulation, error) {
+	conf, err := MakeConfigFromFile(configFilePath)
 	if err != nil {
-		return err, MakeSimulation()
+		return MakeSimulation(), err
 	}
 	sim := MakeSimulationFromConf(conf)
-	return nil, sim
+	return sim, nil
 }
 
-func MakeSimulationFromConf(conf SphConfig) (Simulation){
-	sim := Simulation {
+func MakeSimulationFromConf(conf SphConfig) Simulation {
+	sim := Simulation{
 		Config: conf,
 	}
 
@@ -89,7 +89,7 @@ func (sim *Simulation) Step() {
 	if sim.CurrentStep == 0 {
 
 		// TODO(#2): check if simulation initialized
-		if sim.Root == nil || len(sim.Root.Particles) == 0  {
+		if sim.Root == nil || len(sim.Root.Particles) == 0 {
 			panic("int Run(): Simulation not initialized!")
 		}
 
@@ -106,14 +106,14 @@ func (sim *Simulation) Step() {
 	{
 		// drift 1 for leapfrog dt/2
 		for i, _ := range sim.Root.Particles {
-			p      := &sim.Root.Particles[i]
+			p := &sim.Root.Particles[i]
 
-			vdt    := p.Vel.Mul(dtHalf)
-			p.Pos   = p.Pos.Add(&vdt)
+			vdt := p.Vel.Mul(dtHalf)
+			p.Pos = p.Pos.Add(&vdt)
 
-			adt    := p.VDot.Mul(dtHalf)
+			adt := p.VDot.Mul(dtHalf)
 			p.VPred = p.Vel.Add(&adt)
-			p.EPred = p.E + p.EDot * dtHalf
+			p.EPred = p.E + p.EDot*dtHalf
 		}
 
 		sim.CalculateForces()
@@ -121,17 +121,17 @@ func (sim *Simulation) Step() {
 		// kick dt
 		for i, _ := range sim.Root.Particles {
 			p := &sim.Root.Particles[i]
-			adt  := p.VDot.Mul(2*dtHalf)
+			adt := p.VDot.Mul(2 * dtHalf)
 			p.Vel = p.Vel.Add(&adt)
-			p.E   = p.E + p.EDot*2*dtHalf
+			p.E = p.E + p.EDot*2*dtHalf
 		}
 
 		// drift 2 for leapfrog dt/2
 		for i, _ := range sim.Root.Particles {
 			p := &sim.Root.Particles[i]
 
-			vdt    := p.Vel.Mul(dtHalf)
-			p.Pos   = p.Pos.Add(&vdt)
+			vdt := p.Vel.Mul(dtHalf)
+			p.Pos = p.Pos.Add(&vdt)
 		}
 
 		// Boundary: particles outside boundary get moved around
@@ -197,16 +197,14 @@ func (sim *Simulation) Step() {
 	sim.IsBusy.Unlock()
 }
 
-
 // lets assume mass 1 per particle, so the density is just the 1/volume of sphere
-func DensityTopHat3D(p *Particle) (float64) {
+func DensityTopHat3D(p *Particle) float64 {
 	maxR := p.NNDists[0]
-	return 3 * NN_SIZE / (4*math.Pi*maxR*maxR*maxR)
+	return 3 * NN_SIZE / (4 * math.Pi * maxR * maxR * maxR)
 }
 
-
 // lets assume mass 1 per particle, so the density is just the 1/volume of sphere
-func DensityMonahan3D(p *Particle) (float64) {
+func DensityMonahan3D(p *Particle) float64 {
 	maxR := p.NNDists[0]
 
 	acc := 0.0
@@ -214,7 +212,7 @@ func DensityMonahan3D(p *Particle) (float64) {
 
 	var i int
 	for i = range NN_SIZE {
-		x = p.NNDists[i]/maxR
+		x = p.NNDists[i] / maxR
 
 		if x > 1 || x < 0 {
 			panic("unreachable")
@@ -224,28 +222,26 @@ func DensityMonahan3D(p *Particle) (float64) {
 			acc += x*x*x - x*x + 1.0/6
 			continue
 		}
-		acc += (1 - x)*(1 - x)*(1 - x) / 3
+		acc += (1 - x) * (1 - x) * (1 - x) / 3
 	}
 
-	return acc * 6 * 8 / (math.Pi*maxR*maxR*maxR)
+	return acc * 6 * 8 / (math.Pi * maxR * maxR * maxR)
 }
-
 
 // lets assume mass 1 per particle, so the density is just the 1/volume of sphere
-func DensityTopHat2D(p *Particle) (float64) {
+func DensityTopHat2D(p *Particle) float64 {
 	maxR := p.NNDists[0]
-	return  NN_SIZE / (math.Pi*maxR*maxR)
+	return NN_SIZE / (math.Pi * maxR * maxR)
 }
 
-
 type Kernel struct {
-	F func(q float64) float64
-	FPrefactor float64
-	DF func(q float64) float64
+	F           func(q float64) float64
+	FPrefactor  float64
+	DF          func(q float64) float64
 	DFPrefactor float64
 }
 
-var TopHat2D = Kernel {
+var TopHat2D = Kernel{
 	F: func(q float64) float64 {
 		return 1
 	},
@@ -259,21 +255,21 @@ var TopHat2D = Kernel {
 	DFPrefactor: 1,
 }
 
-var Monahan2D = Kernel {
+var Monahan2D = Kernel{
 	F: func(q float64) float64 {
 		if q < 0.5 {
 			return q*q*q - q*q + 1.0/6
 		}
-		return (1 - q)*(1 - q)*(1 - q) / 3
+		return (1 - q) * (1 - q) * (1 - q) / 3
 	},
 
-	FPrefactor:  6 * 40 / (math.Pi * 7),
+	FPrefactor: 6 * 40 / (math.Pi * 7),
 
 	DF: func(q float64) float64 {
 		if q < 0.5 {
 			return (3*q*q - 2*q)
 		}
-	 	return -(1 - q)*(1 - q)
+		return -(1 - q) * (1 - q)
 	},
 
 	DFPrefactor: 6 * 40 / (math.Pi * 7),
@@ -285,10 +281,10 @@ var Monahan2D = Kernel {
 // 2d F  prefactor -> 4 * ..
 // 2d DF prefactor -> 8 * ..
 
-var Wendtland2D = Kernel {
+var Wendtland2D = Kernel{
 	F: func(q float64) float64 {
 		if q <= 1 {
-			return (1 - q)*(1 - q)*(1 - q)*(1 - q)*(1 + 4*q)
+			return (1 - q) * (1 - q) * (1 - q) * (1 - q) * (1 + 4*q)
 		} else {
 			panic("not good..")
 		}
@@ -298,7 +294,7 @@ var Wendtland2D = Kernel {
 
 	DF: func(q float64) float64 {
 		if q <= 1 {
-			return -10 * q * (1 - q)*(1 - q)*(1 - q)
+			return -10 * q * (1 - q) * (1 - q) * (1 - q)
 		} else {
 			panic("not good..")
 		}
@@ -307,8 +303,7 @@ var Wendtland2D = Kernel {
 	DFPrefactor: 8 * 7 / (math.Pi * 4),
 }
 
-
-func Density2D(p *Particle, sim *Simulation, kernel Kernel) (float64) {
+func Density2D(p *Particle, sim *Simulation, kernel Kernel) float64 {
 	maxR := p.NNDists[0]
 
 	acc := 0.0
@@ -316,7 +311,7 @@ func Density2D(p *Particle, sim *Simulation, kernel Kernel) (float64) {
 
 	var i int
 	for i = range NN_SIZE {
-		x = p.NNDists[i]/maxR
+		x = p.NNDists[i] / maxR
 
 		if x > 1 || x < 0 {
 			panic("unreachable")
@@ -324,17 +319,17 @@ func Density2D(p *Particle, sim *Simulation, kernel Kernel) (float64) {
 		acc += kernel.F(x)
 	}
 
-	return kernel.FPrefactor*sim.Config.ParticleMass*acc / (maxR*maxR)
+	return kernel.FPrefactor * sim.Config.ParticleMass * acc / (maxR * maxR)
 }
 
-// - Sum [ (Pa/rhoa^2       + Pb/rhob^2     + PIab )]
-//			contribution A  + contributionB
+//   - Sum [ (Pa/rhoa^2       + Pb/rhob^2     + PIab )]
+//     contribution A  + contributionB
 func AccelerationAndEDot2D(p *Particle, sim *Simulation, kernel Kernel) {
 	gamma := sim.Config.Gamma
-	maxR  := p.NNDists[0]
+	maxR := p.NNDists[0]
 
 	// PA / rhoA^2
-	contributionA := p.C*p.C / (gamma*p.Rho)
+	contributionA := p.C * p.C / (gamma * p.Rho)
 	contributionB := 0.0
 
 	dRKernel := 0.0
@@ -353,7 +348,7 @@ func AccelerationAndEDot2D(p *Particle, sim *Simulation, kernel Kernel) {
 			break
 		}
 
-		q   = p.NNDists[i]/maxR 			// r/h in lecture
+		q = p.NNDists[i] / maxR // r/h in lecture
 
 		if q > 1 || q < 0 {
 			panic("kernel parameter q not in [0, 1]!")
@@ -361,9 +356,8 @@ func AccelerationAndEDot2D(p *Particle, sim *Simulation, kernel Kernel) {
 
 		dRKernel = kernel.DF(q)
 
-
 		// PB / rhoB^2
-		contributionB = nn.C*nn.C / (gamma*nn.Rho)
+		contributionB = nn.C * nn.C / (gamma * nn.Rho)
 
 		vA := p.VPred
 		vB := nn.VPred
@@ -377,21 +371,21 @@ func AccelerationAndEDot2D(p *Particle, sim *Simulation, kernel Kernel) {
 		// Viscosity Term
 		//
 
-		vAB   := vB.Sub(&vA)
-		rAB   := rB.Sub(&rA)
-		dot   := vAB.Dot(&rAB)
-		piAB  := 0.0
+		vAB := vB.Sub(&vA)
+		rAB := rB.Sub(&rA)
+		dot := vAB.Dot(&rAB)
+		piAB := 0.0
 		if dot < 0 {
 			const (
 				alpha = 0.75
 				beta  = 1.5
 				etaSq = 0.01
 			)
-			cAB   := 0.5 * (p.C + nn.C)
+			cAB := 0.5 * (p.C + nn.C)
 			rhoAB := 0.5 * (p.Rho + nn.Rho)
-			hAB   := 0.5 * (p.NNDists[0] + nn.NNDists[0])
-			muAB  := dot * hAB / (rAB.Dot(&rAB) + etaSq)
-			piAB  = (-alpha*cAB*muAB + beta*muAB*muAB) / rhoAB
+			hAB := 0.5 * (p.NNDists[0] + nn.NNDists[0])
+			muAB := dot * hAB / (rAB.Dot(&rAB) + etaSq)
+			piAB = (-alpha*cAB*muAB + beta*muAB*muAB) / rhoAB
 		}
 
 		acc_ax += rAB.X * (piAB + contributionA + contributionB) * dRKernel / p.NNDists[i]
@@ -400,13 +394,11 @@ func AccelerationAndEDot2D(p *Particle, sim *Simulation, kernel Kernel) {
 	}
 
 	acc := Vec2{acc_ax, acc_ay}
-    acc = acc.Mul(sim.Config.ParticleMass * kernel.DFPrefactor / (maxR*maxR*maxR))
-    acc = acc.Add(&sim.Config.Acceleration)
+	acc = acc.Mul(sim.Config.ParticleMass * kernel.DFPrefactor / (maxR * maxR * maxR))
+	acc = acc.Add(&sim.Config.Acceleration)
 	p.VDot = acc
 	p.EDot = contributionA * acc_edot * sim.Config.ParticleMass // Benz formulation
 }
-
-
 
 func (sim *Simulation) CalculateForces() {
 

@@ -6,7 +6,7 @@ import (
 
 func main() {
 
-	cmaps := []func(uint8)(gx.Color){gx.RainbowRamp, gx.ParaRamp, gx.HeatRamp, gx.ToxicRamp}
+	cmaps := []func(uint8) gx.Color{gx.RainbowRamp, gx.ParaRamp, gx.HeatRamp, gx.ToxicRamp}
 
 	var width = 20
 
@@ -14,7 +14,7 @@ func main() {
 
 	for j, cmap := range cmaps {
 		for i := range 256 {
-			c.DrawRect(gx.Vec2i{j*width,255-i}, gx.Vec2i{(j+1)*width,255-i}, cmap(uint8(i)))
+			c.DrawRect(gx.Vec2i{j * width, 255 - i}, gx.Vec2i{(j + 1) * width, 255 - i}, cmap(uint8(i)))
 		}
 	}
 

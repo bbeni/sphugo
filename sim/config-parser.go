@@ -12,22 +12,22 @@ to debug config files.
 package sim
 
 import (
-	"unicode"
-	"fmt"
-	"os"
-	"math/rand"
-	"time"
-	"strconv"
-	"math"
 	"errors"
+	"fmt"
+	"math"
+	"math/rand"
+	"os"
+	"strconv"
+	"time"
+	"unicode"
 )
 
 // For now these Titles and Subtitles are valid
 var validTitleSubtitles = map[string][]string{
 	"Simulation": {"Config", "Viewport"},
-	"Start": 	  {"UniformRect"},
+	"Start":      {"UniformRect"},
 	"Boundaries": {"Periodic", "Reflection"},
-	"Sources": 	  {"Point"},
+	"Sources":    {"Point"},
 }
 
 type ParticleSource interface {
@@ -47,8 +47,8 @@ type PointSource struct {
 }
 
 // sensible defaults
-func MakeUniformRectSpawner() UniformRectSpawner{
-	return UniformRectSpawner {
+func MakeUniformRectSpawner() UniformRectSpawner {
+	return UniformRectSpawner{
 		LowerRight: Vec2{1, 1},
 		NParticles: 1000,
 	}
@@ -60,14 +60,14 @@ func (spwn UniformRectSpawner) Spawn(t float64) []Particle {
 	if USE_RANDOM_SEED {
 		rand.Seed(time.Now().UnixNano())
 	} else {
-	    rand.Seed(12345678)
+		rand.Seed(12345678)
 	}
 
- 	particles := make([]Particle, spwn.NParticles)
+	particles := make([]Particle, spwn.NParticles)
 
 	for i := range spwn.NParticles {
-		x := spwn.UpperLeft.X + rand.Float64() * (spwn.LowerRight.X - spwn.UpperLeft.X)
-		y := spwn.UpperLeft.Y + rand.Float64() * (spwn.LowerRight.Y - spwn.UpperLeft.Y)
+		x := spwn.UpperLeft.X + rand.Float64()*(spwn.LowerRight.X-spwn.UpperLeft.X)
+		y := spwn.UpperLeft.Y + rand.Float64()*(spwn.LowerRight.Y-spwn.UpperLeft.Y)
 		particles[i].Pos = Vec2{x, y}
 	}
 
@@ -80,7 +80,7 @@ func (spwn UniformRectSpawner) Spawn(t float64) []Particle {
 }
 
 func (spwn *PointSource) Spawn(t float64) []Particle {
-	deltaT   := t - spwn.LastSpwned
+	deltaT := t - spwn.LastSpwned
 	cooldown := 1 / spwn.rate
 
 	n := int(deltaT / cooldown)
@@ -88,8 +88,8 @@ func (spwn *PointSource) Spawn(t float64) []Particle {
 
 	particles := make([]Particle, n)
 	for i := range n {
-		dy := 0.01 * (-1 + 2 * rand.Float64())
-		dx := 0.01 * (-1 + 2 * rand.Float64())
+		dy := 0.01 * (-1 + 2*rand.Float64())
+		dx := 0.01 * (-1 + 2*rand.Float64())
 		pos := Vec2{spwn.origin.X + dx, spwn.origin.Y + dy}
 
 		particles[i].Pos = pos
@@ -105,37 +105,36 @@ type Reflections struct {
 	L float64
 	R float64
 	U float64
-	D float64	
+	D float64
 }
 
 type SphConfig struct {
-	NSteps 		 	int
-	DeltaTHalf		float64
-	Gamma  		 	float64
-	ParticleMass 	float64
-	Acceleration	Vec2
+	NSteps       int
+	DeltaTHalf   float64
+	Gamma        float64
+	ParticleMass float64
+	Acceleration Vec2
 
-	Kernel			Kernel
+	Kernel Kernel
 
 	HorPeriodicity  [2]float64 // -math.MaxFloat64, math.MaxFloat64 is open
 	VertPeriodicity [2]float64 // -math.MaxFloat64, math.MaxFloat64 is open
 
-	Reflections	    Reflections
-	Sources 		[]ParticleSource
-	Start			[]ParticleSource
+	Reflections Reflections
+	Sources     []ParticleSource
+	Start       []ParticleSource
 
-	Viewport		[2]Vec2  // upperleft and lower right
+	Viewport [2]Vec2 // upperleft and lower right
 }
-
 
 // default values conifg all valuues are zero or empty arrays except defined in this function:
 func MakeConfig() SphConfig {
 	return SphConfig{
-		Gamma:		  1.66666,
-		NSteps:		  10000,
-		DeltaTHalf:	  0.001,
+		Gamma:        1.66666,
+		NSteps:       10000,
+		DeltaTHalf:   0.001,
 		ParticleMass: 1,
-		Kernel:		  Monahan2D,
+		Kernel:       Monahan2D,
 
 		VertPeriodicity: [2]float64{-math.MaxFloat64, math.MaxFloat64},
 		HorPeriodicity:  [2]float64{-math.MaxFloat64, math.MaxFloat64},
@@ -145,26 +144,26 @@ func MakeConfig() SphConfig {
 			U: -math.MaxFloat64, D: math.MaxFloat64,
 		},
 
-		Viewport:  	  [2]Vec2{Vec2{0, 0}, Vec2{1, 1}},
+		Viewport: [2]Vec2{{0, 0}, {1, 1}},
 	}
 }
 
-func MakeConfigFromFile(configFilePath string) (error, SphConfig) {
+func MakeConfigFromFile(configFilePath string) (SphConfig, error) {
 
 	config := MakeConfig()
 
 	err, tokens := Tokenize(configFilePath)
 	if err != nil {
-		return err, config
+		return config, err
 	}
 
 	err = config.updateFromTokens(tokens)
 
 	if err != nil {
-		return err, MakeConfig() // new default config
+		return MakeConfig(), err // new default config
 	}
 
-	return nil, config
+	return config, nil
 }
 
 func ConfigMakeError(token Token, msg string) error {
@@ -173,14 +172,14 @@ func ConfigMakeError(token Token, msg string) error {
 }
 
 func ConfigParseError(t Tokenizer, msg string) error {
-	m := fmt.Sprintf("%v:%v:%v: ConfigParseError: %v\n", t.fname, t.line+1, t.cursor - t.bol + 1, msg)
+	m := fmt.Sprintf("%v:%v:%v: ConfigParseError: %v\n", t.fname, t.line+1, t.cursor-t.bol+1, msg)
 	return errors.New(m)
 }
 
 type Param struct {
-	Title	 string
+	Title    string
 	Subtitle string
-	Name	 string
+	Name     string
 }
 
 // This function generates a configuration given a tokenized config file
@@ -248,19 +247,29 @@ func (config *SphConfig) updateFromTokens(tokens []Token) error {
 			switch p {
 			case Param{"Simulation", "Config", "NSteps"}:
 				config.NSteps, err = checkInt(token, p)
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 			case Param{"Simulation", "Config", "Gamma"}:
-				config.Gamma , err = checkFloat(token, p)
-				if err != nil { return err }
+				config.Gamma, err = checkFloat(token, p)
+				if err != nil {
+					return err
+				}
 			case Param{"Simulation", "Config", "ParticleMass"}:
 				config.ParticleMass, err = checkFloat(token, p)
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 			case Param{"Simulation", "Config", "DeltaTHalf"}:
 				config.DeltaTHalf, err = checkFloat(token, p)
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 			case Param{"Simulation", "Config", "Acceleration"}:
 				config.Acceleration, err = checkVec2(token, p)
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 			case Param{"Simulation", "Config", "Kernel"}:
 				kernel := token.AsStr
 				if kernel == "Monahan" {
@@ -272,17 +281,17 @@ func (config *SphConfig) updateFromTokens(tokens []Token) error {
 				}
 
 			case Param{"Simulation", "Viewport", "UpperLeft"}:
-					 config.Viewport[0], err = checkVec2(token, p)
+				config.Viewport[0], err = checkVec2(token, p)
 			case Param{"Simulation", "Viewport", "LowerRight"}:
-					 config.Viewport[1], err = checkVec2(token, p)
+				config.Viewport[1], err = checkVec2(token, p)
 
 			case Param{"Start", "UniformRect", "NParticles"},
-			     Param{"Start", "UniformRect", "UpperLeft"},
-				 Param{"Start", "UniformRect", "LowerRight"}:
+				Param{"Start", "UniformRect", "UpperLeft"},
+				Param{"Start", "UniformRect", "LowerRight"}:
 
 				// Expect exactly these 3 Params
 				if len(tokens) < 2 {
-					return ConfigMakeError(token, fmt.Sprintf("Expected 3 Params following [`%v`] but got something else or nothing.\n\tOne of each paramas `NParticles, UpperLeft, LowerRight` must be defined", subtitleStr, ))
+					return ConfigMakeError(token, fmt.Sprintf("Expected 3 Params following [`%v`] but got something else or nothing.\n\tOne of each paramas `NParticles, UpperLeft, LowerRight` must be defined", subtitleStr))
 				}
 
 				startSpawner := UniformRectSpawner{}
@@ -299,22 +308,28 @@ func (config *SphConfig) updateFromTokens(tokens []Token) error {
 					}
 
 					switch token.Name {
-						case "NParticles":
-							startSpawner.NParticles, err = checkInt(token, p)
-							if err != nil { return err }
-						case "UpperLeft":
-							startSpawner.UpperLeft, err = checkVec2(token, p)
-							if err != nil { return err }
-						case "LowerRight":
-							startSpawner.LowerRight, err = checkVec2(token, p)
-							if err != nil { return err }
-						default:
-							return ConfigMakeError(token, fmt.Sprintf("The parameter name `%v` in [`%v`] is not valid. Needs to be one of `NParticles, UpperLeft, LowerRight`", token.Name, subtitleStr))
+					case "NParticles":
+						startSpawner.NParticles, err = checkInt(token, p)
+						if err != nil {
+							return err
+						}
+					case "UpperLeft":
+						startSpawner.UpperLeft, err = checkVec2(token, p)
+						if err != nil {
+							return err
+						}
+					case "LowerRight":
+						startSpawner.LowerRight, err = checkVec2(token, p)
+						if err != nil {
+							return err
+						}
+					default:
+						return ConfigMakeError(token, fmt.Sprintf("The parameter name `%v` in [`%v`] is not valid. Needs to be one of `NParticles, UpperLeft, LowerRight`", token.Name, subtitleStr))
 					}
 
 					got = append(got, p.Name)
 
-					if i==2 {
+					if i == 2 {
 						break
 					}
 					token, tokens = tokens[0], tokens[1:]
@@ -326,59 +341,78 @@ func (config *SphConfig) updateFromTokens(tokens []Token) error {
 
 				config.Start = append(config.Start, startSpawner)
 
-
 			case Param{"Boundaries", "Periodic", "Vertical"}:
 				// TODO: make somehow sure left < right and so on
 				x, err := checkVec2(token, p)
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 				config.VertPeriodicity = [2]float64{x.X, x.Y}
 
 			case Param{"Boundaries", "Periodic", "Horizontal"}:
 				x, err := checkVec2(token, p)
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 				config.HorPeriodicity = [2]float64{x.X, x.Y}
 
 			case Param{"Boundaries", "Reflection", "Left"}:
 				x, err := checkFloat(token, p)
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 				config.Reflections.L = x
 			case Param{"Boundaries", "Reflection", "Right"}:
 				x, err := checkFloat(token, p)
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 				config.Reflections.R = x
 			case Param{"Boundaries", "Reflection", "Up"}:
 				x, err := checkFloat(token, p)
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 				config.Reflections.U = x
 			case Param{"Boundaries", "Reflection", "Down"}:
 				x, err := checkFloat(token, p)
-				if err != nil { return err }
+				if err != nil {
+					return err
+				}
 				config.Reflections.D = x
-			
+
 			case Param{"Sources", "Point", "Pos"},
 				Param{"Sources", "Point", "Rate"}:
 
-				var pos  Vec2
+				var pos Vec2
 				var rate float64
 				if token.Name == "Pos" {
 					pos, err = checkVec2(token, p)
-					if err != nil { return err }
+					if err != nil {
+						return err
+					}
 					if len(tokens) == 0 {
 						return ConfigMakeError(token, fmt.Sprintf("Expected `rate` but got nothing"))
 					}
 					token, tokens = tokens[0], tokens[1:]
 					rate, err = checkFloat(token, p)
-					if err != nil { return err }
+					if err != nil {
+						return err
+					}
 
 				} else {
 					rate, err = checkFloat(token, p)
-					if err != nil { return err }
+					if err != nil {
+						return err
+					}
 					if len(tokens) == 0 {
 						return ConfigMakeError(token, fmt.Sprintf("Expected `pos` but got nothing"))
 					}
 					token, tokens = tokens[0], tokens[1:]
 					pos, err = checkVec2(token, p)
-					if err != nil { return err }
+					if err != nil {
+						return err
+					}
 				}
 
 				pointSource := &PointSource{
@@ -389,7 +423,7 @@ func (config *SphConfig) updateFromTokens(tokens []Token) error {
 				config.Sources = append(config.Sources, pointSource)
 
 			default:
-				return ConfigMakeError(token, fmt.Sprintf("`%v` is not a valid parameter in `[[%v]]` - `[%v]`", token.Name, titleStr, subtitleStr ))
+				return ConfigMakeError(token, fmt.Sprintf("`%v` is not a valid parameter in `[[%v]]` - `[%v]`", token.Name, titleStr, subtitleStr))
 			}
 		}
 	}
@@ -405,7 +439,7 @@ func checkInt(t Token, p Param) (int, error) {
 }
 
 func checkFloat(t Token, p Param) (float64, error) {
-	if t.Type != integer && t.Type != float  {
+	if t.Type != integer && t.Type != float {
 		return 0, ConfigMakeError(t, fmt.Sprintf("expected an integer or float but got something else"))
 	}
 	if t.Type == integer {
@@ -423,6 +457,7 @@ func checkVec2(t Token, p Param) (Vec2, error) {
 
 //go:generate stringer -type TokenType
 type TokenType int
+
 const (
 	title TokenType = iota
 	subtitle
@@ -434,22 +469,22 @@ const (
 
 type Token struct {
 	Type    TokenType
-	AsStr 	string
-	AsInt 	int64
+	AsStr   string
+	AsInt   int64
 	AsFloat float64
 	AsVec2  Vec2
 
 	// if it's a parameter
-	Name	string
+	Name string
 
 	// info for error reporting
-	Line	int
-	Row		int
-	Fname	*string
+	Line  int
+	Row   int
+	Fname *string
 }
 
 func Tokenize(fname string) (error, []Token) {
-	t	   := MakeTokenizer(fname)
+	t := MakeTokenizer(fname)
 	tokens := make([]Token, 0)
 
 	for {
@@ -492,7 +527,7 @@ func Tokenize(fname string) (error, []Token) {
 				t.chop(1)
 
 				t.expectIs(unicode.IsSpace, "a space or newline after `]`")
-				tokens = append(tokens, Token{Type: subtitle, AsStr: string(content), Line: t.line+1, Row: startRow, Fname:&fname})
+				tokens = append(tokens, Token{Type: subtitle, AsStr: string(content), Line: t.line + 1, Row: startRow, Fname: &fname})
 			} else if t.isExactly('[') {
 				t.chop(1)
 				startRow := t.cursor - t.bol + 1
@@ -520,7 +555,7 @@ func Tokenize(fname string) (error, []Token) {
 				t.chop(1)
 
 				t.expectIs(unicode.IsSpace, "a space or newline after `]]`")
-				tokens = append(tokens, Token{Type: title, AsStr: string(content), Line: t.line+1, Row: startRow, Fname:&fname})
+				tokens = append(tokens, Token{Type: title, AsStr: string(content), Line: t.line + 1, Row: startRow, Fname: &fname})
 			} else {
 				msg := fmt.Sprintf("Expected a Title starting with `[[` or a Subtitle starting with `[` and then at least one letter")
 				return ConfigParseError(t, msg), tokens
@@ -574,7 +609,7 @@ func Tokenize(fname string) (error, []Token) {
 							return err, tokens
 						}
 						t.expectIs(unicode.IsSpace, "a whitespace or newline")
-						toParse = append(toParse, string(leftPart) + "." + string(rightPart))
+						toParse = append(toParse, string(leftPart)+"."+string(rightPart))
 						isThereAFloat = true
 					} else if len(t.text) == 0 || unicode.IsSpace(t.text[0]) {
 						//got int
@@ -594,33 +629,31 @@ func Tokenize(fname string) (error, []Token) {
 					return ConfigParseError(t, msg), tokens
 				}
 
-
 				// one numer
 				if nNumbersFound == 1 {
 					if isThereAFloat {
 						// parse as float
 						x, err := strconv.ParseFloat(toParse[0], 64)
 						check(err)
-						tokens = append(tokens, Token{Name: varName, Type: float, AsFloat: x, Line: t.line+1, Row: startRow, Fname:&fname})
+						tokens = append(tokens, Token{Name: varName, Type: float, AsFloat: x, Line: t.line + 1, Row: startRow, Fname: &fname})
 
 					} else {
 						// parse as int
 						x, err := strconv.ParseInt(toParse[0], 10, 64)
 						check(err)
-						tokens = append(tokens, Token{Name: varName, Type: integer, AsInt: x, Line: t.line+1, Row: startRow, Fname:&fname})
+						tokens = append(tokens, Token{Name: varName, Type: integer, AsInt: x, Line: t.line + 1, Row: startRow, Fname: &fname})
 					}
 				} else if nNumbersFound == 2 {
 
-						// parse as vec2
-						x1, err := strconv.ParseFloat(toParse[0], 64)
-						check(err)
-						x2, err := strconv.ParseFloat(toParse[1], 64)
-						check(err)
-						tokens = append(tokens, Token{Name: varName, Type: vec2, AsVec2: Vec2{x1, x2}, Line: t.line+1, Row: startRow, Fname:&fname})
+					// parse as vec2
+					x1, err := strconv.ParseFloat(toParse[0], 64)
+					check(err)
+					x2, err := strconv.ParseFloat(toParse[1], 64)
+					check(err)
+					tokens = append(tokens, Token{Name: varName, Type: vec2, AsVec2: Vec2{x1, x2}, Line: t.line + 1, Row: startRow, Fname: &fname})
 				} else {
 					panic("unreachable")
 				}
-
 
 			} else if t.is(aLetter) { // parse a word
 				supposedWord := string(t.chopUntilIsNoFail(notALetter))
@@ -629,7 +662,7 @@ func Tokenize(fname string) (error, []Token) {
 					return ConfigParseError(t, msg), tokens
 				}
 
-				tokens = append(tokens, Token{Name: varName, Type: word, AsStr: supposedWord, Line: t.line+1, Row: startRow, Fname: &fname})
+				tokens = append(tokens, Token{Name: varName, Type: word, AsStr: supposedWord, Line: t.line + 1, Row: startRow, Fname: &fname})
 
 			} else {
 				msg := fmt.Sprintf("`%v` Excpected a Number/Vec2 or Word", varName)
@@ -638,13 +671,12 @@ func Tokenize(fname string) (error, []Token) {
 
 		} else {
 			fmt.Println(tokens)
-			panic(fmt.Sprintf("%v:%v: unimplemented - starts with: `%v`\n", t.line, t.cursor - t.bol + 1, string(t.text[0])))
+			panic(fmt.Sprintf("%v:%v: unimplemented - starts with: `%v`\n", t.line, t.cursor-t.bol+1, string(t.text[0])))
 		}
 	}
 
 	return nil, tokens
 }
-
 
 func check(err error) {
 	if err != nil {
@@ -670,19 +702,19 @@ func isIn(sArray []string, s string) bool {
 }
 
 func aLetter(c rune) bool {
-    return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
+	return ('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z')
 }
 
 func notALetter(c rune) bool {
-    return !(('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z'))
+	return !(('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z'))
 }
 
 func aDigit(c rune) bool {
-    return ('0' <= c && c <= '9')
+	return ('0' <= c && c <= '9')
 }
 
 func notADigit(c rune) bool {
-    return !('0' <= c && c <= '9')
+	return !('0' <= c && c <= '9')
 }
 
 func aWhitespace(r rune) bool {
@@ -714,11 +746,10 @@ func MakeTokenizer(fname string) (tokenizer Tokenizer) {
 	runes := ReadEntireFile(fname)
 	t := Tokenizer{
 		fname: fname,
-		text: runes,
+		text:  runes,
 	}
 	return t
 }
-
 
 func (t *Tokenizer) chop(n int) {
 	if n > len(t.text) {
@@ -730,17 +761,17 @@ func (t *Tokenizer) chop(n int) {
 		t.cursor += 1
 		t.text = t.text[1:]
 		if r == '\n' {
-			t.line   += 1
-			t.bol     = t.cursor
+			t.line += 1
+			t.bol = t.cursor
 		}
 	}
 
 }
 
 func (t *Tokenizer) chopUntilIs(pred func(r rune) bool, expectationMsg string) (error, []rune) {
-	i 	 := 0
+	i := 0
 	text := t.text
-	for ;len(t.text) > 0 && !pred(t.text[0]); i++ {
+	for ; len(t.text) > 0 && !pred(t.text[0]); i++ {
 		t.chop(1)
 	}
 	if len(t.text) == 0 {
@@ -750,10 +781,10 @@ func (t *Tokenizer) chopUntilIs(pred func(r rune) bool, expectationMsg string) (
 	return nil, text[:i]
 }
 
-func (t *Tokenizer) chopUntilIsNoFail(pred func(r rune) bool) ([]rune) {
-	i 	 := 0
+func (t *Tokenizer) chopUntilIsNoFail(pred func(r rune) bool) []rune {
+	i := 0
 	text := t.text
-	for ;len(t.text) > 0 && !pred(t.text[0]); i++ {
+	for ; len(t.text) > 0 && !pred(t.text[0]); i++ {
 		t.chop(1)
 	}
 	return text[:i]
@@ -810,14 +841,13 @@ func (t *Tokenizer) expectIs(pred func(rune) bool, expectationMsg string) error 
 }
 
 func inSlice(list []string, a string) bool {
-    for _, b := range list {
-        if b == a {
-            return true
-        }
-    }
-    return false
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }
-
 
 func GenerateDefaultConfigFiles(filePaths [2]string) {
 	GenerateTextFile(filePaths[0], exampleConfigSource1)
@@ -826,7 +856,7 @@ func GenerateDefaultConfigFiles(filePaths [2]string) {
 
 func GenerateTextFile(filePath string, source string) {
 	if _, err := os.Stat(filePath); err != nil {
-	    if os.IsNotExist(err) {
+		if os.IsNotExist(err) {
 			file, err := os.Create(filePath)
 			if err != nil {
 				fmt.Printf("Error: couldn't create file %q : %q", filePath, err)
@@ -835,7 +865,7 @@ func GenerateTextFile(filePath string, source string) {
 			defer file.Close()
 
 			file.WriteString(source)
-	    }
+		}
 	}
 }
 

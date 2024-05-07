@@ -2,29 +2,28 @@ package sim
 
 import (
 	"fmt"
-	"math/rand"
 	"math"
-	"time"
+	"math/rand"
 )
 
 // Configuration
 const (
-	MAX_PARTICLES_PER_CELL  = 8
-	SPLIT_FRACTION 			= 0.5   // Fraction of left to total space for Treebuild(), usually 0.5.
-	USE_RANDOM_SEED 		= false // for generating randomly distributed particles in init_uniformly()
-	NN_SIZE 				= 32    // Nearest Neighbour Size
+	MAX_PARTICLES_PER_CELL = 8
+	SPLIT_FRACTION         = 0.5   // Fraction of left to total space for Treebuild(), usually 0.5.
+	USE_RANDOM_SEED        = false // for generating randomly distributed particles in init_uniformly()
+	NN_SIZE                = 32    // Nearest Neighbour Size
 )
 
 type Particle struct {
 	Pos Vec2
 	Vel Vec2
-	Rho float64   // Density
-	C float64     // Speed of sound
-	E float64     // Specific internal energy
+	Rho float64 // Density
+	C   float64 // Speed of sound
+	E   float64 // Specific internal energy
 
 	// Temporary values filled by Simulation
-	EDot float64  // specific internal energy change de/dt
-	VDot Vec2     // Acceleration
+	EDot  float64 // specific internal energy change de/dt
+	VDot  Vec2    // Acceleration
 	EPred float64 // Predicted internal energy
 	VPred Vec2    // Predicted Velicty
 	// 96 bytes until now
@@ -35,8 +34,8 @@ type Particle struct {
 	// for now we just naively implement it like this
 	// 32*(8+8)  = 512 bytes
 	NearestNeighbours [NN_SIZE]*Particle
-	NNDists 		  [NN_SIZE]float64
-	NNPos			  [NN_SIZE]Vec2     // keep track of position,  we need to know because of periodic b.c.
+	NNDists           [NN_SIZE]float64
+	NNPos             [NN_SIZE]Vec2 // keep track of position,  we need to know because of periodic b.c.
 
 	// visualisation trick for depth rendering
 	Z int
@@ -60,25 +59,24 @@ type Cell struct {
 	Upper *Cell
 }
 
-
 type Orientation int
+
 const (
 	Vertical Orientation = iota
 	Horizontal
 )
 
-func (orientation Orientation) other() (Orientation) {
-	if orientation == Vertical { return Horizontal }
+func (orientation Orientation) other() Orientation {
+	if orientation == Vertical {
+		return Horizontal
+	}
 	return Vertical
 }
 
-
 func InitUniformly(particles []Particle) {
 
-	if USE_RANDOM_SEED {
-		rand.Seed(time.Now().UnixNano())
-	} else {
-	    rand.Seed(12345678)
+	if !USE_RANDOM_SEED {
+		rand.Seed(12345678)
 	}
 
 	// Uniformely in [0, 1] x [0, 1]
@@ -88,17 +86,16 @@ func InitUniformly(particles []Particle) {
 	}
 	for i, _ := range particles {
 		particles[i].Rho = 1
-		particles[i].Z   = rand.Int()
+		particles[i].Z = rand.Int()
 	}
 }
 
-
-func MakeCells(particles []Particle, ori Orientation) (*Cell) {
+func MakeCells(particles []Particle, ori Orientation) *Cell {
 
 	root := Cell{
-		LowerLeft: Vec2{0, 0},
+		LowerLeft:  Vec2{0, 0},
 		UpperRight: Vec2{1, 1},
-		Particles: particles[:],
+		Particles:  particles[:],
 	}
 
 	root.Treebuild(ori)
@@ -107,8 +104,7 @@ func MakeCells(particles []Particle, ori Orientation) (*Cell) {
 	return &root
 }
 
-
-func MakeCellsUniform(n int, orientation Orientation) (*Cell) {
+func MakeCellsUniform(n int, orientation Orientation) *Cell {
 
 	particles := make([]Particle, n)
 	InitUniformly(particles)
@@ -117,54 +113,63 @@ func MakeCellsUniform(n int, orientation Orientation) (*Cell) {
 	return cell
 }
 
-func MakeCell(numberParticles int, initalizer func(index int) Vec2 ) (root *Cell) {
+func MakeCell(numberParticles int, initalizer func(index int) Vec2) (root *Cell) {
 	panic("Not Implemented")
 }
 
-
 /* The function Partition() partitions an array of type Particle based
- on their 2d position. They are compared to a pivot value called middle
- in a "quick sort like" manner in a specified axis that can either be
- "Vertical" or "Horizontal". The tests should cover most edge cases.
- Returns two partitioned slices a, b (just indices of array in Go).*/
+on their 2d position. They are compared to a pivot value called middle
+in a "quick sort like" manner in a specified axis that can either be
+"Vertical" or "Horizontal". The tests should cover most edge cases.
+Returns two partitioned slices a, b (just indices of array in Go).*/
 
-func Partition (ps []Particle, orientation Orientation, middle float64) (a, b []Particle) {
+func Partition(ps []Particle, orientation Orientation, middle float64) (a, b []Particle) {
 	i := 0
 	j := len(ps) - 1
 
 	if orientation == Vertical {
 		for i < j {
-			for i < j && ps[i].Pos.Y <= middle { i++ }
-			for i < j && ps[j].Pos.Y > middle { j-- }
+			for i < j && ps[i].Pos.Y <= middle {
+				i++
+			}
+			for i < j && ps[j].Pos.Y > middle {
+				j--
+			}
 
 			if ps[i].Pos.Y > ps[j].Pos.Y {
 				ps[i], ps[j] = ps[j], ps[i]
 			}
-			if i == j && middle > ps[i].Pos.Y {i++}
+			if i == j && middle > ps[i].Pos.Y {
+				i++
+			}
 		}
 	} else {
 		for i < j {
-			for i < j && ps[i].Pos.X <= middle { i++ }
-			for i < j && ps[j].Pos.X > middle { j-- }
+			for i < j && ps[i].Pos.X <= middle {
+				i++
+			}
+			for i < j && ps[j].Pos.X > middle {
+				j--
+			}
 
 			if ps[i].Pos.X > ps[j].Pos.X {
 				ps[i], ps[j] = ps[j], ps[i]
 			}
 		}
-		if i == j && middle > ps[i].Pos.X {i++}
+		if i == j && middle > ps[i].Pos.X {
+			i++
+		}
 	}
 	return ps[:i], ps[i:]
 }
 
-
 /*The function Treebuild() recurses and partitions an array of
- N_PARTICLES length int Cells that have maximally
- MAX_PARTICLES_PER_CELL particles.
- The SPLIT_FRACTION determines the fraction of space in
- the specific direction for left/total or top/total. */
+N_PARTICLES length int Cells that have maximally
+MAX_PARTICLES_PER_CELL particles.
+The SPLIT_FRACTION determines the fraction of space in
+the specific direction for left/total or top/total. */
 
-func (root *Cell) Treebuild (orientation Orientation) {
-
+func (root *Cell) Treebuild(orientation Orientation) {
 
 	// dirty fix: particles out of [0, 1] x [0, 1] will grow cells indefinitely
 	// MAX_PARTICLES_PER_CELL not satisfied...
@@ -174,17 +179,17 @@ func (root *Cell) Treebuild (orientation Orientation) {
 
 	var mid float64
 	if orientation == Vertical {
-		mid = SPLIT_FRACTION * root.LowerLeft.Y + (1 - SPLIT_FRACTION) * root.UpperRight.Y
+		mid = SPLIT_FRACTION*root.LowerLeft.Y + (1-SPLIT_FRACTION)*root.UpperRight.Y
 	} else {
-		mid = SPLIT_FRACTION * root.LowerLeft.X + (1 - SPLIT_FRACTION) * root.UpperRight.X
+		mid = SPLIT_FRACTION*root.LowerLeft.X + (1-SPLIT_FRACTION)*root.UpperRight.X
 	}
 
 	a, b := Partition(root.Particles, orientation, mid)
 
 	if len(a) > 0 {
 		root.Lower = &Cell{
-			Particles: a,
-			LowerLeft: root.LowerLeft,
+			Particles:  a,
+			LowerLeft:  root.LowerLeft,
 			UpperRight: root.UpperRight,
 		}
 
@@ -194,15 +199,15 @@ func (root *Cell) Treebuild (orientation Orientation) {
 			root.Lower.UpperRight.X = mid
 		}
 
-		if len(a) > MAX_PARTICLES_PER_CELL{
+		if len(a) > MAX_PARTICLES_PER_CELL {
 			root.Lower.Treebuild(orientation.other())
 		}
 	}
 
 	if len(b) > 0 {
 		root.Upper = &Cell{
-			Particles: b,
-			LowerLeft: root.LowerLeft,
+			Particles:  b,
+			LowerLeft:  root.LowerLeft,
 			UpperRight: root.UpperRight,
 		}
 
@@ -217,7 +222,6 @@ func (root *Cell) Treebuild (orientation Orientation) {
 		}
 	}
 }
-
 
 // Adapted idea from: (might be worse)
 // 1990, Jack Ritter proposed a simple algorithm to find a non-minimal bounding sphere.
@@ -265,7 +269,6 @@ func (root *Cell) BoundingSpheres() {
 		return
 	}
 
-
 	if root.Upper != nil {
 		root.Upper.BoundingSpheres()
 	}
@@ -308,9 +311,10 @@ func (root *Cell) BoundingSpheres() {
 	}
 }
 
-
 func (root *Cell) Dumptree(level int) {
-	for i := 0; i < level; i++ { fmt.Print("  ") }
+	for i := 0; i < level; i++ {
+		fmt.Print("  ")
+	}
 	fmt.Println(root.LowerLeft, root.UpperRight)
 	if root.Upper != nil {
 		root.Upper.Dumptree(level + 1)
@@ -322,7 +326,11 @@ func (root *Cell) Dumptree(level int) {
 
 func (root *Cell) Depth() int {
 	a, b := 0, 0
-	if root.Upper != nil { a = root.Upper.Depth() }
-	if root.Lower != nil { b = root.Lower.Depth() }
+	if root.Upper != nil {
+		a = root.Upper.Depth()
+	}
+	if root.Lower != nil {
+		b = root.Lower.Depth()
+	}
 	return Max(a, b) + 1
 }

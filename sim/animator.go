@@ -1,14 +1,14 @@
 package sim
 
 import (
-	"image"
-	"math"
-	"log"
 	"fmt"
+	"image"
+	"image/draw"
+	"image/png"
+	"log"
+	"math"
 	"os"
 	"strings"
-	"image/png"
-	"image/draw"
 
 	"github.com/bbeni/sphugo/gx"
 	"github.com/go-gl/gl/v4.2-core/gl"
@@ -19,7 +19,7 @@ import (
 type Animator struct {
 
 	//frames for rendering
-	Frames   []image.Image
+	Frames []image.Image
 	//FramesMu sync.Mutex
 
 	// as refernce to simulation variables
@@ -32,15 +32,15 @@ type Animator struct {
 
 func MakeAnimator(simulation *Simulation) Animator {
 
-	if simulation.Root == nil || len(simulation.Root.Particles) == 0  {
+	if simulation.Root == nil || len(simulation.Root.Particles) == 0 {
 		panic("int Run(): Simulation not initialized!")
 	}
 
-	ani := Animator {
+	ani := Animator{
 		renderingParticleArray: make([]*Particle, len(simulation.Root.Particles)),
 	}
 
-	for i, _ := range simulation.Root.Particles {
+	for i := range simulation.Root.Particles {
 		ani.renderingParticleArray[i] = &simulation.Root.Particles[i]
 	}
 
@@ -52,7 +52,6 @@ func MakeAnimator(simulation *Simulation) Animator {
 	return ani
 }
 
-
 func (ani *Animator) CurrentFrame() gx.Canvas {
 	//
 	// order according to z-value
@@ -60,7 +59,7 @@ func (ani *Animator) CurrentFrame() gx.Canvas {
 
 	ani.renderingParticleArray = make([]*Particle, len(ani.Simulation.Root.Particles))
 
-	for i, _ := range ani.Simulation.Root.Particles {
+	for i := range ani.Simulation.Root.Particles {
 		ani.renderingParticleArray[i] = &ani.Simulation.Root.Particles[i]
 	}
 
@@ -83,18 +82,17 @@ func (ani *Animator) CurrentFrame() gx.Canvas {
 		//color_index := 255 - uint8(zNormalized * 256)
 
 		m := ani.Simulation.Config.ParticleMass
-		colorFormula := float64(particle.Rho/(m* float64(len(ani.Simulation.Root.Particles)*10))*256)
+		colorFormula := float64(particle.Rho / (m * float64(len(ani.Simulation.Root.Particles)*10)) * 256)
 		//colorFormula := float64(particle.Vel.Norm()*256)
 
 		color_index := uint8(math.Min(colorFormula, 255))
 		color := gx.ParaRamp(color_index)
 		//color := gx.HeatRamp(color_index)
 		//color := gx.ToxicRamp(color_index)
-	    //color := gx.RainbowRamp(255 - color_index)
-
+		//color := gx.RainbowRamp(255 - color_index)
 
 		if color_index > 255 {
-			nnRadius := float32(particle.NNDists[0])*float32(canvas.W)
+			nnRadius := float32(particle.NNDists[0]) * float32(canvas.W)
 			canvas.DrawCircle(x, y, nnRadius, 2, gx.WHITE)
 		}
 
@@ -131,21 +129,20 @@ func (ani *Animator) FrameToPNG(file_path string, i int) bool {
 	return true
 }
 
-
 type Frame struct {
-	Positions [ ][2]float32
-	NNPos	  [2][2]float32
-	Densities [ ]float32
+	Positions [][2]float32
+	NNPos     [2][2]float32
+	Densities []float32
 }
 
 type AnimatorGL struct {
-	sim *Simulation
+	sim    *Simulation
 	Frames []Frame
 }
 
 func MakeAnimatorGL(sim *Simulation) AnimatorGL {
 	ani := AnimatorGL{
-		sim: sim,
+		sim:    sim,
 		Frames: make([]Frame, 0, sim.Config.NSteps),
 	}
 
@@ -181,16 +178,16 @@ func (ani *AnimatorGL) AddFrame() {
 // gl stuff
 
 var previousTime float64
-var angle		 float64
+var angle float64
 
-var program 	 uint32
-var vao 		 uint32
-var texture      uint32
+var program uint32
+var vao uint32
+var texture uint32
 
 var positionUniform int32
 var densityUniform int32
 
-var camera        mgl32.Mat4
+var camera mgl32.Mat4
 var cameraUniform int32
 
 func (ani *AnimatorGL) Init(windowWidth, windowHeight int) {
@@ -218,7 +215,7 @@ func (ani *AnimatorGL) Init(windowWidth, windowHeight int) {
 
 	// Load the texture
 	texture, err = newTexture("water_droplet.png")
-//	texture, err = newTexture("other_drop.png")
+	//	texture, err = newTexture("other_drop.png")
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -234,12 +231,12 @@ func (ani *AnimatorGL) Init(windowWidth, windowHeight int) {
 	//Square
 	// x, y, u, v
 	quad := []float32{
-		-0.5,  0.5,  0,  1,
-		0.5,  -0.5,  1,  0,
-		-0.5, -0.5,  0,  0,
-		-0.5,  0.5,  0,  1,
-		0.5,   0.5,  1,  1,
-		0.5,  -0.5,  1,  0,
+		-0.5, 0.5, 0, 1,
+		0.5, -0.5, 1, 0,
+		-0.5, -0.5, 0, 0,
+		-0.5, 0.5, 0, 1,
+		0.5, 0.5, 1, 1,
+		0.5, -0.5, 1, 0,
 	}
 
 	gl.BufferData(gl.ARRAY_BUFFER, len(quad)*4, gl.Ptr(quad), gl.STATIC_DRAW)
@@ -302,14 +299,14 @@ func (ani *AnimatorGL) DrawFrame(index int) {
 	gl.ActiveTexture(gl.TEXTURE0)
 	gl.BindTexture(gl.TEXTURE_2D, texture)
 
-	fmt.Println(1.0/elapsed)
+	fmt.Println(1.0 / elapsed)
 
 	gl.UniformMatrix4fv(cameraUniform, 1, false, &camera[0])
 
 	frame := &ani.Frames[index]
 
 	for i := range frame.Positions {
-		gl.Uniform2f(positionUniform, float32(frame.Positions[i][0]*1.75 - 0.5), float32(1-frame.Positions[i][1]))
+		gl.Uniform2f(positionUniform, float32(frame.Positions[i][0]*1.75-0.5), float32(1-frame.Positions[i][1]))
 		gl.Uniform1f(densityUniform, float32(frame.Densities[i]/10000))
 		fmt.Println(float32(frame.Positions[i][0]*1.75 - 0.5))
 		gl.DrawArrays(gl.TRIANGLES, 0, 6)

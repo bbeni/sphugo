@@ -1,9 +1,12 @@
-/* Heap methods
+/*
+	Heap methods
+
 Author: Benjamin Frölich
 
 This packacke should provide methods for heapification of arrays.
 
 TODOs:
+
 	Goals:
 		- [x] Min-Heap
 		- [ ] Max-Heap
@@ -23,16 +26,16 @@ TODOs:
 package sim
 
 import (
-	"fmt"
 	"cmp"
-	"strings"
 	"errors"
+	"fmt"
+	"strings"
 )
 
 /* Heap indexed in the following way:
-	i parent
-		-> i*2 + 1   left  child
-		-> i*2 + 2   right child */
+i parent
+	-> i*2 + 1   left  child
+	-> i*2 + 2   right child */
 
 /* Heapify()
 
@@ -72,7 +75,7 @@ func Heapify[T cmp.Ordered](array []T, i int) {
 
 func HeapifyRec[T cmp.Ordered](array []T, i int) {
 
-	l := (i + 1) * 2 - 1
+	l := (i+1)*2 - 1
 	r := (i + 1) * 2
 	min_index := i
 
@@ -91,19 +94,21 @@ func HeapifyRec[T cmp.Ordered](array []T, i int) {
 }
 
 func BuildHeap[T cmp.Ordered](array []T) {
-	if len(array) < 2 { return }
+	if len(array) < 2 {
+		return
+	}
 	for i := len(array)/2 - 1; i >= 0; i-- {
 		Heapify(array, i)
 	}
 }
 
-func Insert[T cmp.Ordered](array []T, element T) ([]T) {
+func Insert[T cmp.Ordered](array []T, element T) []T {
 	array = append(array, element)
-	index := len(array)-1
+	index := len(array) - 1
 	parent := len(array)/2 - 1
 	for parent >= 0 && array[index] < array[parent] {
 		array[parent], array[index] = array[index], array[parent]
-		index, parent = parent, (parent + 1)/2 - 1
+		index, parent = parent, (parent+1)/2-1
 	}
 	return array
 }
@@ -122,10 +127,10 @@ func ExtractMin[T cmp.Ordered](array []T) ([]T, T, error) {
 		return array, def, errors.New("in ExtractMin(): array can not be empty")
 	}
 	min := array[0]
-	array[0] = array[len(array) - 1]
-	array = array[:len(array) - 1]
+	array[0] = array[len(array)-1]
+	array = array[:len(array)-1]
 	Heapify(array, 0)
-	return  array, min, nil
+	return array, min, nil
 }
 
 func Replace[T cmp.Ordered](array []T, element T) ([]T, T, error) {
@@ -142,23 +147,33 @@ func Replace[T cmp.Ordered](array []T, element T) ([]T, T, error) {
 
 func dump[T cmp.Ordered](x []T, index, level int) {
 
-	if index >= len(x) { return }
+	if index >= len(x) {
+		return
+	}
 
-	l := (index + 1)*2 - 1
-	r := (index + 1)*2
+	l := (index+1)*2 - 1
+	r := (index + 1) * 2
 
-	if r < len(x){
-		for range level { fmt.Print("    ") }
+	if r < len(x) {
+		for range level {
+			fmt.Print("    ")
+		}
 		fmt.Printf("R=%v\n", x[r])
 	}
 
-	if l < len(x){
-		for range level { fmt.Print("    ") }
+	if l < len(x) {
+		for range level {
+			fmt.Print("    ")
+		}
 		fmt.Printf("L=%v\n", x[l])
 	}
 
-	if r < len(x) { dump(x, r, level+1) }
-	if l < len(x) { dump(x, l, level+1) }
+	if r < len(x) {
+		dump(x, r, level+1)
+	}
+	if l < len(x) {
+		dump(x, l, level+1)
+	}
 }
 
 // print the Heap in [node - right - left] top down fashin
@@ -174,33 +189,35 @@ func DumpHeap1[T cmp.Ordered](array []T) {
 
 func DumpHeap[T cmp.Ordered](array []T) {
 
-	spaces := func(amount int) (string) {
+	spaces := func(amount int) string {
 		return strings.Repeat(" ", amount)
 	}
 
 	level := 0
-	for (len(array) >> level) != 0 { level++ }
+	for (len(array) >> level) != 0 {
+		level++
+	}
 
 	fmt.Println()
-	fmt.Println(spaces(1 << level - 6) + "[Root Node]")
+	fmt.Println(spaces(1<<level-6) + "[Root Node]")
 	for i := range level {
-		offset := 1 << i - 1
+		offset := 1<<i - 1
 		for j := range offset + 1 {
 			index := j + offset
 			if index < len(array) {
-				n_spaces := 1 << (level - i) - 1
-				fmt.Printf(spaces(n_spaces) + "%v" + spaces(n_spaces), array[index])
+				n_spaces := 1<<(level-i) - 1
+				fmt.Printf(spaces(n_spaces)+"%v"+spaces(n_spaces), array[index])
 			}
 		}
 		fmt.Print("\n\n")
-		mid_count := 1 << (level - i) - 2
+		mid_count := 1<<(level-i) - 2
 		mid_spaces := spaces(mid_count)
 		for j := range offset + 1 {
 			index := j + offset
-			if index < len(array)/2{
+			if index < len(array)/2 {
 				n_spaces := 1 << (level - i - 1)
 				fmt.Printf(spaces(n_spaces) + "/")
-				if index <= len(array)/2 - 2 || len(array) % 2 == 1  {
+				if index <= len(array)/2-2 || len(array)%2 == 1 {
 					fmt.Printf(mid_spaces + "\\" + spaces(n_spaces))
 				}
 			}
@@ -208,7 +225,6 @@ func DumpHeap[T cmp.Ordered](array []T) {
 		fmt.Print("\n")
 	}
 }
-
 
 func QuickSort(particles []*Particle, cmpValue func(*Particle) int) {
 	if len(particles) > 0 {
@@ -227,7 +243,7 @@ func partitionQS(ps []*Particle, cmpValue func(*Particle) int) ([]*Particle, []*
 		panic("QS unreachable")
 	}
 
-	pivot := cmpValue(ps[len(ps) - 1])
+	pivot := cmpValue(ps[len(ps)-1])
 
 	for i < j {
 		for i < j && cmpValue(ps[i]) <= pivot {
@@ -245,10 +261,8 @@ func partitionQS(ps []*Particle, cmpValue func(*Particle) int) ([]*Particle, []*
 	if cmpValue(ps[i]) > pivot {
 		ps[i], ps[len(ps)-1] = ps[len(ps)-1], ps[i]
 	} else {
-		i = len(ps)-1
+		i = len(ps) - 1
 	}
 
 	return ps[:i], ps[i+1:]
 }
-
-

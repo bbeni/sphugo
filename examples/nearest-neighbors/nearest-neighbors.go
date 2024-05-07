@@ -14,8 +14,8 @@ Goal:
 package main
 
 import (
-	"github.com/bbeni/sphugo/sim"
 	"github.com/bbeni/sphugo/gx"
+	"github.com/bbeni/sphugo/sim"
 )
 
 func NonPeriodic() {
@@ -39,7 +39,6 @@ func NonPeriodic() {
 	x, y := p0.Pos.X*float64(w), p0.Pos.Y*float64(h)
 	canvas.DrawDisk(float32(x), float32(y), 10, gx.GREEN)
 
-
 	// Find the nearest neighbors of the picked particle and plot them
 	p0.FindNearestNeighbours(root)
 	for i := range sim.NN_SIZE {
@@ -49,7 +48,7 @@ func NonPeriodic() {
 	}
 
 	// Draw green circle
-	radius := float32(p0.NNDists[0]*float64(w))
+	radius := float32(p0.NNDists[0] * float64(w))
 	canvas.DrawCircle(float32(x), float32(y), radius, 2, gx.GREEN)
 
 	canvas.ToPNG("nearest_neighbours.png")
@@ -75,9 +74,8 @@ func Periodic() {
 	x, y := p0.Pos.X*float64(w), p0.Pos.Y*float64(h)
 	canvas.DrawDisk(float32(x), float32(y), 10, gx.GREEN)
 
-
 	// Find the nearest neighbors of the picked particle and plot them
-	p0.FindNearestNeighboursPeriodic(root, [2]float64{0, 1}, [2]float64{0, 1} )
+	p0.FindNearestNeighboursPeriodic(root, [2]float64{0, 1}, [2]float64{0, 1})
 	for i := range sim.NN_SIZE {
 		pn := *p0.NearestNeighbours[i]
 		x, y := pn.Pos.X*float64(w), pn.Pos.Y*float64(h)
@@ -85,9 +83,9 @@ func Periodic() {
 	}
 
 	// Draw green circles periodic
-	for i := -1.0; i<=1; i++ {
-		for j := -1.0; j<=1; j++ {
-			radius := float32(p0.NNDists[0]*float64(w))
+	for i := -1.0; i <= 1; i++ {
+		for j := -1.0; j <= 1; j++ {
+			radius := float32(p0.NNDists[0] * float64(w))
 			pixel_x := float32(x) + float32(float64(w)*i)
 			pixel_y := float32(y) + float32(float64(h)*j)
 			canvas.DrawCircle(pixel_x, pixel_y, radius, 2, gx.GREEN)

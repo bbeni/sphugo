@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-var psEven = [...]Particle {
+var psEven = [...]Particle{
 	{Pos: Vec2{1.0, 1.0}},
 	{Pos: Vec2{0.9, 0.9}},
 	{Pos: Vec2{0.8, 0.8}},
@@ -63,8 +63,7 @@ func TestPartitionEvenHor2(t *testing.T) {
 	}
 }
 
-
-var psOdd = [...]Particle {
+var psOdd = [...]Particle{
 	{Pos: Vec2{0.0, 0.9}},
 	{Pos: Vec2{0.5, -0.8}},
 	{Pos: Vec2{1.7, 0.1}},
@@ -96,9 +95,6 @@ func TestPartitionOddHor1(t *testing.T) {
 	}
 }
 
-
-
-
 func TestPartitionOddVer2(t *testing.T) {
 
 	a, b := Partition(psOdd[:], Vertical, -100)
@@ -110,7 +106,6 @@ func TestPartitionOddVer2(t *testing.T) {
 		t.Fatalf("expected len(b)=5, got %d", len(a))
 	}
 }
-
 
 func TestPartitionOddHor2(t *testing.T) {
 
@@ -124,45 +119,42 @@ func TestPartitionOddHor2(t *testing.T) {
 	}
 }
 
-
 func expect(lenA, lenB, a, b int, t *testing.T) {
 	if lenA != a || lenB != b {
 		t.Fatalf("expected len(a)=%d got %d and len(b)=%d got %d", lenA, a, lenB, b)
 	}
 }
 
-var psVariation = [...]Particle {
-	{Pos: Vec2{0.9,  0.0}},
-	{Pos: Vec2{-0.8,  0.5}},
-	{Pos: Vec2{0.1,  1.7}},
-	{Pos: Vec2{-0.1,  0.7}},
+var psVariation = [...]Particle{
+	{Pos: Vec2{0.9, 0.0}},
+	{Pos: Vec2{-0.8, 0.5}},
+	{Pos: Vec2{0.1, 1.7}},
+	{Pos: Vec2{-0.1, 0.7}},
 	{Pos: Vec2{0.1, -0.7}},
 }
 
-func TestPartitionVariationHor1 (t *testing.T) {
+func TestPartitionVariationHor1(t *testing.T) {
 	a, b := Partition(psVariation[:], Horizontal, 0.100000000001)
 	expect(4, 1, len(a), len(b), t)
 }
 
-
-func TestPartitionVariationVer1 (t *testing.T) {
+func TestPartitionVariationVer1(t *testing.T) {
 	a, b := Partition(psVariation[:], Vertical, 0.601)
 	expect(3, 2, len(a), len(b), t)
 }
 
-func TestPartitionVariationHor2 (t *testing.T) {
+func TestPartitionVariationHor2(t *testing.T) {
 	a, b := Partition(psVariation[:], Horizontal, -100)
 	expect(0, 5, len(a), len(b), t)
 }
 
-func TestPartitionVariationVer2 (t *testing.T) {
+func TestPartitionVariationVer2(t *testing.T) {
 	a, b := Partition(psVariation[:], Vertical, 100)
 	expect(5, 0, len(a), len(b), t)
 }
 
-
 func TestPartitionEmpty(t *testing.T) {
-	psEmpty := [...]Particle {}
+	psEmpty := [...]Particle{}
 	a, b := Partition(psEmpty[:], Horizontal, 0.85)
 	expect(0, 0, len(a), len(b), t)
 }

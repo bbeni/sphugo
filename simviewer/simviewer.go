@@ -144,7 +144,7 @@ func run() {
 	exampleConfigFilePaths := [2]string{"example.sph-config", "tube.sph-config"}
 	sim.GenerateDefaultConfigFiles(exampleConfigFilePaths)
 
-	err, simulation := sim.MakeSimulationFromConfig(exampleConfigFilePaths[0])
+	simulation, err := sim.MakeSimulationFromConfig(exampleConfigFilePaths[0])
 	if err != nil {
 		svState.TermMsg = fmt.Sprintf("%v", err)
 	} else {
@@ -221,7 +221,7 @@ func run() {
 						svState.ConfigChooserOpened = false
 						simulationToggle <- false
 
-						err, simulation = sim.MakeSimulationFromConfig(configPath)
+						simulation, err = sim.MakeSimulationFromConfig(configPath)
 						if err != nil {
 							svState.TermMsg = fmt.Sprintf("%v", err)
 						} else {

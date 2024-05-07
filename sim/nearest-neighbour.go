@@ -1,13 +1,12 @@
 package sim
 
 import (
-	"math"
 	"fmt"
+	"math"
 )
 
-//TODO: remove
+// TODO: remove
 var _ = fmt.Print
-
 
 // recursively find all nearest neighbors of a particle based on position
 // make sure you call it on the top/root Cell!!
@@ -37,27 +36,27 @@ func (particle *Particle) FindNearestNeighboursPeriodic(root *Cell, HorPeriodic,
 	deltaX := HorPeriodic[1] - HorPeriodic[0]
 	deltaY := VertPeriodic[1] - VertPeriodic[0]
 
-	if HorPeriodic[0]==-math.MaxFloat64 {
+	if HorPeriodic[0] == -math.MaxFloat64 {
 		iStart = 0
 		iEnd = 0
 		deltaX = 0
-		if HorPeriodic[1]!=math.MaxFloat64 {
+		if HorPeriodic[1] != math.MaxFloat64 {
 			panic("cannot have open and periodic boundary in horizontal at same time!")
 		}
 	}
 
-	if VertPeriodic[0]==-math.MaxFloat64 {
+	if VertPeriodic[0] == -math.MaxFloat64 {
 		jStart = 0
 		jEnd = 0
 		deltaY = 0
-		if VertPeriodic[1]!=math.MaxFloat64 {
+		if VertPeriodic[1] != math.MaxFloat64 {
 			panic("cannot have open and periodic boundary in vertical at same time!")
 		}
 	}
 
 	for i := iStart; i <= iEnd; i++ {
 		for j := jStart; j <= jEnd; j++ {
-			particle.findNNRec(root, Vec2{float64(i)*deltaX, float64(j)*deltaY})
+			particle.findNNRec(root, Vec2{float64(i) * deltaX, float64(j) * deltaY})
 		}
 	}
 
@@ -66,7 +65,6 @@ func (particle *Particle) FindNearestNeighboursPeriodic(root *Cell, HorPeriodic,
 		particle.NNDists[i] = math.Sqrt(particle.NNDists[i])
 	}
 }
-
 
 // TODO: @Speed fix Sqrts
 func (particle *Particle) findNNRec(root *Cell, offset Vec2) {
@@ -93,17 +91,17 @@ func (particle *Particle) findNNRec(root *Cell, offset Vec2) {
 		maxDist := math.Sqrt(particle.NNQueuePeekKey())
 
 		if distLower < distUpper {
-			if distLower - root.Lower.BRadius < maxDist {
+			if distLower-root.Lower.BRadius < maxDist {
 				particle.findNNRec(root.Lower, offset)
 			}
-			if distUpper - root.Upper.BRadius < maxDist {
+			if distUpper-root.Upper.BRadius < maxDist {
 				particle.findNNRec(root.Upper, offset)
 			}
 		} else {
-			if distUpper - root.Upper.BRadius < maxDist {
+			if distUpper-root.Upper.BRadius < maxDist {
 				particle.findNNRec(root.Upper, offset)
 			}
-			if distLower - root.Lower.BRadius < maxDist {
+			if distLower-root.Lower.BRadius < maxDist {
 				particle.findNNRec(root.Lower, offset)
 			}
 
@@ -134,13 +132,13 @@ func (p *Particle) NNQueuePeekKey() float64 {
 	return p.NNDists[0]
 }
 
-
 // This is actually faster than the heapque. it's probably beacuse we only have 32 NN's
 // TODO: compare for other NN_SIZEs than 32
-//    using copy() is actually slower, because it is not inlined  anymore by the compiler
+//
+//	using copy() is actually slower, because it is not inlined  anymore by the compiler
 func (p *Particle) NNQueueInsert(dist float64, neighbour *Particle, realPos Vec2) {
 	var i uint8 = 1
-	for ;i<NN_SIZE && p.NNDists[i] > dist; i++ {
+	for ; i < NN_SIZE && p.NNDists[i] > dist; i++ {
 		p.NNDists[i-1] = p.NNDists[i]
 		p.NearestNeighbours[i-1] = p.NearestNeighbours[i]
 		p.NNPos[i-1] = p.NNPos[i]

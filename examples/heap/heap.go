@@ -10,14 +10,14 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 	"github.com/bbeni/sphugo/sim"
+	"math/rand"
 )
 
 /* Heap indexed in the following way:
-	i parent
-		-> (i+1)*2-1 left  child
-		-> (i+1)*2   right child
+i parent
+	-> (i+1)*2-1 left  child
+	-> (i+1)*2   right child
 */
 
 const ARRAY_CAP = 1024 // Dynamic array initial capacity
@@ -29,7 +29,7 @@ func main() {
 	array := make([]int, 0, ARRAY_CAP)
 
 	for _ = range 26 {
-		array = append(array, rand.Int() % 90 + 9)
+		array = append(array, rand.Int()%90+9)
 	}
 
 	fmt.Printf("\n")

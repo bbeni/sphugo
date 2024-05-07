@@ -27,7 +27,6 @@ func isInsideAny(pos Vec2, cell *Cell) bool {
 	return false
 }
 
-
 func TestInsideAnySphere60(t *testing.T) {
 
 	cell := MakeCellsUniform(60, Vertical)
