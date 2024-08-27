@@ -1,6 +1,8 @@
 # SPHUGO
 
-**S**mooth **P**article **H**ydrodynamics **U**sing **GO**
+**S**moothed **P**article **H**ydrodynamics **U**sing **GO**
+
+A gui program that simulates a 2D SPH simulation, see [SPH](https://en.wikipedia.org/wiki/Smoothed-particle_hydrodynamics).
 
 Source code available at (www.github.com/bbeni/sphugo)
 
@@ -12,19 +14,21 @@ Install Go from [here](https://go.dev/doc/install). Then run
 go build ./simviewer/
 ```
 
-The resulting executable is independent of where it's run. It will generate an example.sph-config file where it's run. Configurations can be loaded in the simviewer program - they have to be in the folder it's run from. The example.sph-config can be modified using a text editor and should show what is possible, while serving as documentation.
+(this takes approximately 6 min the first time, as it has to compile glew and gl). The resulting executable is independent of where it's run. It will generate two .sph-config files in the folder where it's run. Configurations are text files and can be loaded in the simviewer program - they have to be in the folder it's run from. The example files should serve as documentation. To run the simulation programm do
 
-Linux/MacOs:
+on Linux/MacOs:
 
 ```console
 ./simviewer
 ```
 
-Windows:
+on Windows:
 
 ```console
 ./simviewer.exe
 ```
+
+![](doc/screenshot.png)
 
 # Tasks leading to final code
 
